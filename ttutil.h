@@ -1,6 +1,6 @@
 /*************************************************************************************************
  * The utility API of Tokyo Tyrant
- *                                                      Copyright (C) 2006-2008 Mikio Hirabayashi
+ *                                                      Copyright (C) 2006-2009 Mikio Hirabayashi
  * This file is part of Tokyo Tyrant.
  * Tokyo Tyrant is free software; you can redistribute it and/or modify it under the terms of
  * the GNU Lesser General Public License as published by the Free Software Foundation; either
@@ -404,8 +404,8 @@ bool ttserviskilled(TTSERV *serv);
  *************************************************************************************************/
 
 
-#define _TT_VERSION    "1.1.10"
-#define _TT_LIBVER     202
+#define _TT_VERSION    "1.1.11"
+#define _TT_LIBVER     203
 #define _TT_PROTVER    "0.9"
 
 

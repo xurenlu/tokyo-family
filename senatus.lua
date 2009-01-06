@@ -287,6 +287,24 @@ function incrdouble(key, value)
 end
 
 
+-- call a versatile function of the misc function
+function misc(key, value)
+   local args = {}
+   for arg in string.gmatch(value, "[^\t\n]+") do
+      table.insert(args, arg)
+   end
+   local res = _misc(key, args)
+   if not res then
+      return nil
+   end
+   local rbuf = ""
+   for i = 1, #res do
+      rbuf = rbuf .. res[i] .. "\n"
+   end
+   return rbuf
+end
+
+
 -- encode or decode a string
 function codec(key, value)
    if key == "ucs" then

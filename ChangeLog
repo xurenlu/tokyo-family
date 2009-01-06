@@ -1,5 +1,13 @@
 2008-12-08  Mikio Hirabayashi  <mikio@users.sourceforge.net>
 
+	* tcrdb.c (tcrdbmisc): the return value of the "getlist" function was modified.
+
+	* scrext.c (serv_misc): new function.
+
+	- Release: 1.1.11
+
+2008-12-08  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
 	* ttutil.c (tcsocksetlife): new function.
 
 	* scrext.c (scrextnew): "_thnum" parameter was added.

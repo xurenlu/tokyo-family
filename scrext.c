@@ -1,6 +1,6 @@
 /*************************************************************************************************
  * Scripting language extension of Tokyo Tyrant
- *                                                      Copyright (C) 2006-2008 Mikio Hirabayashi
+ *                                                      Copyright (C) 2006-2009 Mikio Hirabayashi
  * This file is part of Tokyo Tyrant.
  * Tokyo Tyrant is free software; you can redistribute it and/or modify it under the terms of
  * the GNU Lesser General Public License as published by the Free Software Foundation; either
@@ -179,6 +179,7 @@ static int serv_adddouble(lua_State *lua);
 static int serv_vanish(lua_State *lua);
 static int serv_rnum(lua_State *lua);
 static int serv_size(lua_State *lua);
+static int serv_misc(lua_State *lua);
 static int serv_foreach(lua_State *lua);
 static int serv_stashput(lua_State *lua);
 static int serv_stashout(lua_State *lua);
@@ -240,6 +241,7 @@ void *scrextnew(int thnum, int thid, const char *path, TCADB *adb, TCULOG *ulog,
   lua_register(lua, "_vanish", serv_vanish);
   lua_register(lua, "_rnum", serv_rnum);
   lua_register(lua, "_size", serv_size);
+  lua_register(lua, "_misc", serv_misc);
   lua_register(lua, "_foreach", serv_foreach);
   lua_register(lua, "_stashput", serv_stashput);
   lua_register(lua, "_stashout", serv_stashout);
@@ -320,6 +322,7 @@ char *scrextcallmethod(void *scr, const char *name,
     lua_settop(lua, 0);
     return NULL;
   }
+  if(lua_gettop(lua) < 1) return NULL;
   size_t rsiz;
   const char *rbuf = lua_tolstring(lua, 1, &rsiz);
   if(!rbuf){
@@ -671,6 +674,73 @@ static int serv_size(lua_State *lua){
 }
 
 
+/* for _misc function */
+static int serv_misc(lua_State *lua){
+  int argc = lua_gettop(lua);
+  if(argc < 1){
+    lua_pushstring(lua, "_misc: invalid arguments");
+    lua_error(lua);
+  }
+  const char *name = lua_tostring(lua, 1);
+  if(!name){
+    lua_pushstring(lua, "_misc: invalid arguments");
+    lua_error(lua);
+  }
+  bool ulog = true;
+  if(*name == '$'){
+    name++;
+    ulog = false;
+  }
+  TCLIST *args = tclistnew();
+  for(int i = 2; i <= argc; i++){
+    const char *aptr;
+    size_t asiz;
+    int len;
+    switch(lua_type(lua, i)){
+    case LUA_TNUMBER:
+    case LUA_TSTRING:
+      aptr = lua_tolstring(lua, i, &asiz);
+      tclistpush(args, aptr, asiz);
+      break;
+    case LUA_TTABLE:
+      len = lua_objlen(lua, i);
+      for(int j = 1; j <= len; j++){
+        lua_rawgeti(lua, i, j);
+        switch(lua_type(lua, -1)){
+        case LUA_TNUMBER:
+        case LUA_TSTRING:
+          aptr = lua_tolstring(lua, -1, &asiz);
+          tclistpush(args, aptr, asiz);
+          break;
+        }
+        lua_pop(lua, 1);
+      }
+      break;
+    }
+  }
+  lua_getglobal(lua, SERVVAR);
+  SERV *serv = lua_touserdata(lua, -1);
+  TCLIST *res = ulog ? tculogadbmisc(serv->ulog, serv->sid, serv->adb, name, args) :
+    tcadbmisc(serv->adb, name, args);
+  lua_settop(lua, 0);
+  if(res){
+    int rnum = tclistnum(res);
+    lua_createtable(lua, rnum, 0);
+    for(int i = 0; i < rnum; i++){
+      int rsiz;
+      const char *rbuf = tclistval(res, i, &rsiz);
+      lua_pushlstring(lua, rbuf, rsiz);
+      lua_rawseti(lua, 1, i + 1);
+    }
+    tclistdel(res);
+  } else {
+    lua_pushnil(lua);
+  }
+  tclistdel(args);
+  return 1;
+}
+
+
 /* for _foreach function */
 static int serv_foreach(lua_State *lua){
   int argc = lua_gettop(lua);
@@ -777,11 +847,7 @@ static int serv_stashvanish(lua_State *lua){
   }
   lua_getglobal(lua, SERVVAR);
   SERV *serv = lua_touserdata(lua, -1);
-  lua_pushvalue(lua, 1);
-  lua_setglobal(lua, ITERVAR);
   tcmdbvanish(serv->stash);
-  lua_pushnil(lua);
-  lua_setglobal(lua, ITERVAR);
   return 0;
 }
 

@@ -1,6 +1,6 @@
 /*************************************************************************************************
  * The command line utility of the remote database API
- *                                                      Copyright (C) 2007-2008 Mikio Hirabayashi
+ *                                                      Copyright (C) 2007-2009 Mikio Hirabayashi
  * This file is part of Tokyo Tyrant.
  * Tokyo Tyrant is free software; you can redistribute it and/or modify it under the terms of
  * the GNU Lesser General Public License as published by the Free Software Foundation; either
@@ -1354,7 +1354,7 @@ static int prochttp(const char *url, TCMAP *hmap, bool ih){
 /* perform version command */
 static int procversion(void){
   printf("Tokyo Tyrant version %s (%d:%s)\n", ttversion, _TT_LIBVER, _TT_PROTVER);
-  printf("Copyright (C) 2007-2008 Mikio Hirabayashi\n");
+  printf("Copyright (C) 2007-2009 Mikio Hirabayashi\n");
   return 0;
 }
 

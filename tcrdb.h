@@ -1,6 +1,6 @@
 /*************************************************************************************************
  * The remote database API of Tokyo Tyrant
- *                                                      Copyright (C) 2006-2008 Mikio Hirabayashi
+ *                                                      Copyright (C) 2006-2009 Mikio Hirabayashi
  * This file is part of Tokyo Tyrant.
  * Tokyo Tyrant is free software; you can redistribute it and/or modify it under the terms of
  * the GNU Lesser General Public License as published by the Free Software Foundation; either
@@ -467,9 +467,9 @@ char *tcrdbstat(TCRDB *rdb);
    All databases support "putlist", "outlist", and "getlist".  "putlist" is to store records.  It
    receives keys and values one after the other, and returns an empty list.  "outlist" is to
    remove records.  It receives keys, and returns an empty list.  "getlist" is to retrieve
-   records.  It receives keys, and returns values.  Because the object of the return value is
-   created with the function `tclistnew', it should be deleted with the function `tclistdel' when
-   it is no longer in use. */
+   records.  It receives keys, and returns keys and values of corresponding records one after the
+   other.  Because the object of the return value is created with the function `tclistnew', it
+   should be deleted with the function `tclistdel' when it is no longer in use. */
 TCLIST *tcrdbmisc(TCRDB *rdb, const char *name, int opts, const TCLIST *args);
 
 

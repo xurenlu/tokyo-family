@@ -165,8 +165,8 @@ var {
 
 <h1 id="headline">Tokyo Tyrant: network interface of Tokyo Cabinet</h1>
 
-<div class="note">Copyright (C) 2007-2008 Mikio Hirabayashi</div>
-<div class="note">Last Update: Wed, 30 Jul 2008 16:31:42 +0900</div>
+<div class="note">Copyright (C) 2007-2009 Mikio Hirabayashi</div>
+<div class="note">Last Update: Sat, 03 Jan 2009 22:04:02 +0900</div>
 
 <hr />
 
@@ -223,7 +223,7 @@ var {
 /usr/local/include/tculog.h
 /usr/local/include/tcrdb.h
 /usr/local/lib/libtokyotyrant.a
-/usr/local/lib/libtokyotyrant.so.2.2.0
+/usr/local/lib/libtokyotyrant.so.2.3.0
 /usr/local/lib/libtokyotyrant.so.2
 /usr/local/lib/libtokyotyrant.so
 /usr/local/lib/pkgconfig/tokyotyrant.pc
@@ -912,7 +912,7 @@ var {
 <dd>`<var>opts</var>' specifies options by bitwise or: `RDBMONOULOG' for omission of the update log.</dd>
 <dd>`<var>args</var>' specifies a list object containing arguments.</dd>
 <dd>If successful, the return value is a list object of the result.  `NULL' is returned on failure.</dd>
-<dd>All databases support "putlist", "outlist", and "getlist".  "putlist" is to store records.  It receives keys and values one after the other, and returns an empty list.  "outlist" is to remove records.  It receives keys, and returns an empty list.  "getlist" is to retrieve records.  It receives keys, and returns values.  Because the object of the return value is created with the function `tclistnew', it should be deleted with the function `tclistdel' when it is no longer in use.</dd>
+<dd>All databases support "putlist", "outlist", and "getlist".  "putlist" is to store records.  It receives keys and values one after the other, and returns an empty list.  "outlist" is to remove records.  It receives keys, and returns an empty list.  "getlist" is to retrieve records.  It receives keys, and returns keys and values of corresponding records one after the other.  Because the object of the return value is created with the function `tclistnew', it should be deleted with the function `tclistdel' when it is no longer in use.</dd>
 </dl>
 
 <h3>Example Code</h3>
@@ -972,10 +972,11 @@ int main(int argc, char **argv){
 
 <h3>How to Use the Library</h3>
 
-<p>The API of C is available by programs conforming to the C89 (ANSI C) standard or the C99 standard.  As the header files of Tokyo Tyrant are provided as `<code>tcrdb.h</code>', applications should include it to use the API.  As the library is provided as `<code>libtokyotyrant.a</code>' and `<code>libtokyotyrant.so</code>' and they depends `<code>libtokyocabinet.so</code>', `<code>libz.so</code>', `<code>libresolv.so</code>', `<code>libnsl.so</code>', `<code>libpthread.so</code>', `<code>libm.so</code>', and `<code>libc.so</code>', linker options `<code>-ltokyotyrant</code>', `<code>-ltokyocabinet</code>', `<code>-lz</code>', `<code>-lresolv</code>', `<code>-lnsl</code>', `<code>-lpthread</code>', `<code>-lm</code>', and `<code>-lc</code>' are required for build command.  A typical build command is the following.</p>
+<p>The API of C is available by programs conforming to the C89 (ANSI C) standard or the C99 standard.  As the header files of Tokyo Tyrant are provided as `<code>tcrdb.h</code>', applications should include it to use the API.  As the library is provided as `<code>libtokyotyrant.a</code>' and `<code>libtokyotyrant.so</code>' and they depends `<code>libtokyocabinet.so</code>', `<code>libz.so</code>', `<code>libbz2.so</code>', `<code>libresolv.so</code>', `<code>libnsl.so</code>', `<code>libdl.so</code>', `<code>librt.so</code>', `<code>libpthread.so</code>', `<code>libm.so</code>', and `<code>libc.so</code>', linker options `<code>-ltokyotyrant</code>', `<code>-ltokyocabinet</code>', `<code>-lz</code>', `<code>-lbz2</code>', `<code>-lresolv</code>', `<code>-lnsl</code>', `<code>-ldl</code>', `<code>-lrt</code>', `<code>-lpthread</code>', `<code>-lm</code>', and `<code>-lc</code>' are required for build command.  A typical build command is the following.</p>
 
-<pre>gcc -I/usr/local/include tc_example.c -o tc_example \
-  -L/usr/local/lib -ltokyotyrant -ltokyocabinet -lz -lresolv -lnsl -lpthread -lm -lc
+<pre>gcc -I/usr/local/include tt_example.c -o tt_example \
+  -L/usr/local/lib -ltokyotyrant -ltokyocabinet -lz -lbz2 \
+  -lresolv -lnsl -ldl -lrt -lpthread -lm -lc
 </pre>
 
 <p>You can also use Tokyo Tyrant in programs written in C++.  Because each header is wrapped in C linkage (`<code>extern "C"</code>' block), you can simply include them into your C++ programs.</p>
@@ -1055,6 +1056,11 @@ int main(int argc, char **argv){
 <dt><code>_size()</code></dt>
 <dd>Get the size of the database file.</dd>
 <dd>The return value is the size of the database file.</dd>
+<dt><code>_misc(<var>name</var>, <var>args</var>, ...)</code></dt>
+<dd>Call a versatile function for miscellaneous operations.</dd>
+<dd>`<var>name</var>' specifies the name of the function.  If it begins with "$", the update log is omitted.</dd>
+<dd>`<var>args</var>' specifies an array of arguments.</dd>
+<dd>If successful, the return value is an array of the result.  `nil' is returned on failure.</dd>
 <dt><code>_foreach(<var>func</var>)</code></dt>
 <dd>Process each record atomically.</dd>
 <dd>`<var>func</var>' the iterator function called for each record.  It receives two parameters of the key and the value, and returns true to continue iteration or false to stop iteration.</dd>
@@ -1569,7 +1575,7 @@ end
 
 <h3>Daemon</h3>
 
-<p>To run the server as a daemon process, specify the option `<code>-dmn</code>'.  Moreover, the option `<code>-pid</code>' should be specified to record the process ID into a file.  Note that the current directory of the daemon process is changed to the root directory.  So, the file path parameter should be expressed as absolute path.</p>
+<p>To run the server as a daemon process, specify the option `<code>-dmn</code>'.  Moreover, the option `<code>-pid</code>' should be specified to record the process ID into a file.  Note that the current directory of the daemon process is changed to the root directory.  So, the file path parameter should be expressed as the absolute path.</p>
 
 <pre>[terminal-1]$ ttserver -dmn -pid /tmp/ttserver.pid /tmp/casket.tch
 </pre>
@@ -1815,11 +1821,11 @@ cp -f "$srcpath" "$destpath"
 
 <p>If you use a B+ tree database, set the tuning parameters "#lcnum=<var>xxx</var>#bnum=<var>yyy</var>" to improve performance.  The former specifies the maximum number of leaf nodes to be cached.  It should be larger as long as the capacity of RAM on the system allows.  The latter specifies the bucket number and should be more than 1/128 of the number of records to be stored.</p>
 
-<p>If huge number of clients access the server, make sure the limit number of file descriptors per a process is cleared.  By default on most systems, it is set as 1024.  If so, use `<code>ulimit</code>' to clear it.</p>
+<p>If huge number of clients access the server, make sure the limit number of file descriptors per process is cleared.  By default on most systems, it is set as 1024.  If so, use `<code>ulimit</code>' to clear it.</p>
 
 <h3>Lua Extension</h3>
 
-<p>If you want more complex database operations than existing ones, use the Lua Extension.  For example, prepare the following script and save it as "test.lua".  There is a function "fibonacci" which returns the Fibonacci number of a number of the key.</p>
+<p>If you want more complex database operations than existing ones, use the Lua extension.  For example, prepare the following script and save it as "test.lua".  There is a function "fibonacci" which returns the Fibonacci number of a number of the key.</p>
 
 <pre>function fibonacci(key, value)
    local num = tonumber(key)
@@ -1870,6 +1876,8 @@ end
 [terminal-2]$ tcrmgr ext localhost fibnext
 [terminal-2]$ tcrmgr ext localhost fibnext
 </pre>
+
+<p>As you see, the called function receives two string parameters of the key and the value.  The return value is sent back to the client.  You can use such built-in functions for database operations as "_put", "_out", "_get", and so on.  There is a sample file `<code>/usr/local/share/tokyotyrant/senatus.lua</code>'.</p>
 
 <h3>Using memcached Client</h3>
 
@@ -1928,27 +1936,6 @@ if($res-&gt;is_success()){
     printf("%s\n", $res-&gt;content());
 }
 </pre>
-
-<h3>Using the Lua Extension</h3>
-
-<p>If the Lua extension was enabled when configuration with the `<code>--enable-lua</code>' option, you can define arbitrary operations of the database by Lua.  Create a file "test.lua" and define a function as the following.</p>
-
-<pre>function echo(key, value)
-  return key .. "\t" .. value
-end
-</pre>
-
-<p>Run the server reading the script file.</p>
-
-<pre>[terminal-1]$ ttserver -ext test.lua
-</pre>
-
-<p>Call the "echo" function of the script, in another terminal.</p>
-
-<pre>[terminal-2]$ tcrmgr ext localhost echo foo bar
-</pre>
-
-<p>As you see, the called function receives two string parameters of the key and the value.  The return value is sent back to the client.  You can use such built-in functions for database operations as "_put", "_out", "_get", and so on.  There is a sample file `<code>/usr/local/share/tokyotyrant/senatus.lua</code>'.</p>
 
 <hr />
 

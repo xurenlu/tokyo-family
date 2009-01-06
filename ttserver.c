@@ -1,6 +1,6 @@
 /*************************************************************************************************
  * The server of Tokyo Tyrant
- *                                                      Copyright (C) 2006-2008 Mikio Hirabayashi
+ *                                                      Copyright (C) 2006-2009 Mikio Hirabayashi
  * This file is part of Tokyo Tyrant.
  * Tokyo Tyrant is free software; you can redistribute it and/or modify it under the terms of
  * the GNU Lesser General Public License as published by the Free Software Foundation; either
@@ -235,7 +235,7 @@ int main(int argc, char **argv){
         mask &= ~getcmdmask(argv[i]);
       } else if(!strcmp(argv[i], "--version")){
         printf("Tokyo Tyrant version %s (%d:%s)\n", ttversion, _TT_LIBVER, _TT_PROTVER);
-        printf("Copyright (C) 2006-2008 Mikio Hirabayashi\n");
+        printf("Copyright (C) 2006-2009 Mikio Hirabayashi\n");
         exit(0);
       } else {
         usage();
