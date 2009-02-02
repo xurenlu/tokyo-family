@@ -152,7 +152,7 @@ static int runexport(int argc, char **argv){
         ts = strtoll(argv[i], NULL, 10);
       } else if(!strcmp(argv[i], "-sid")){
         if(++i >= argc) usage();
-        sid = atoi(argv[i]);
+        sid = tcatoi(argv[i]);
       } else if(!strcmp(argv[i], "-ph")){
         ph = true;
       } else {
@@ -178,7 +178,7 @@ static int runimport(int argc, char **argv){
     if(!upath && argv[i][0] == '-'){
       if(!strcmp(argv[i], "-lim")){
         if(++i >= argc) usage();
-        lim = tcatoi(argv[i]);
+        lim = tcatoix(argv[i]);
       } else {
         usage();
       }

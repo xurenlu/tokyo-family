@@ -512,7 +512,7 @@ int tthttpfetch(const char *url, TCMAP *reqheads, TCMAP *resheads, TCXSTR *resbo
   const char *query = tcmapget2(elems, "query");
   if(scheme && !tcstricmp(scheme, "http") && host){
     if(*host == '\0') host = "127.0.0.1";
-    int pnum = port ? atoi(port) : 80;
+    int pnum = port ? tcatoi(port) : 80;
     if(pnum < 1) pnum = 80;
     if(!path) path = "/";
     char addr[TTADDRBUFSIZ];
@@ -563,7 +563,7 @@ int tthttpfetch(const char *url, TCMAP *reqheads, TCMAP *resheads, TCXSTR *resbo
         if(ttsockgets(sock, line, HTTPLINEBUFSIZ) && tcstrfwm(line, "HTTP/")){
           tcstrsqzspc(line);
           const char *rp = strchr(line, ' ');
-          code = atoi(rp + 1);
+          code = tcatoi(rp + 1);
           if(resheads) tcmapput2(resheads, "STATUS", line);
         }
         if(code > 0){
@@ -579,7 +579,7 @@ int tthttpfetch(const char *url, TCMAP *reqheads, TCMAP *resheads, TCXSTR *resbo
             }
             tcstrtolower(line);
             if(!strcmp(line, "content-length")){
-              clen = atoi(pv);
+              clen = tcatoi(pv);
             } else if(!strcmp(line, "transfer-encoding")){
               if(!tcstricmp(pv, "chunked")) chunked = true;
             }
@@ -1202,6 +1202,8 @@ static void *ttservdeqtasks(void *argp){
 
 /* Switch the process into the background. */
 bool ttdaemonize(void){
+  fflush(stdout);
+  fflush(stderr);
   switch(fork()){
   case -1: return false;
   case 0: break;
@@ -1214,7 +1216,7 @@ bool ttdaemonize(void){
   default: _exit(0);
   }
   umask(0);
-  if(chdir("/") == -1) return false;
+  if(chdir(MYPATHSTR) == -1) return false;
   close(0);
   close(1);
   close(2);

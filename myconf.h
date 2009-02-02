@@ -27,67 +27,67 @@
 #if defined(__linux__)
 
 #define _SYS_LINUX_
-#define ESTSYSNAME  "Linux"
+#define TTSYSNAME   "Linux"
 
 #elif defined(__FreeBSD__)
 
 #define _SYS_FREEBSD_
-#define ESTSYSNAME  "FreeBSD"
+#define TTSYSNAME   "FreeBSD"
 
 #elif defined(__NetBSD__)
 
 #define _SYS_NETBSD_
-#define ESTSYSNAME  "NetBSD"
+#define TTSYSNAME   "NetBSD"
 
 #elif defined(__OpenBSD__)
 
 #define _SYS_OPENBSD_
-#define ESTSYSNAME  "OpenBSD"
+#define TTSYSNAME   "OpenBSD"
 
 #elif defined(__sun__)
 
 #define _SYS_SUNOS_
-#define ESTSYSNAME  "SunOS"
+#define TTSYSNAME   "SunOS"
 
 #elif defined(__hpux)
 
 #define _SYS_HPUX_
-#define ESTSYSNAME  "HP-UX"
+#define TTSYSNAME   "HP-UX"
 
 #elif defined(__osf)
 
 #define _SYS_TRU64_
-#define ESTSYSNAME  "Tru64"
+#define TTSYSNAME   "Tru64"
 
 #elif defined(_AIX)
 
 #define _SYS_AIX_
-#define ESTSYSNAME  "AIX"
+#define TTSYSNAME   "AIX"
 
 #elif defined(__APPLE__) && defined(__MACH__)
 
 #define _SYS_MACOSX_
-#define ESTSYSNAME  "Mac OS X"
+#define TTSYSNAME   "Mac OS X"
 
 #elif defined(_MSC_VER)
 
 #define _SYS_MSVC_
-#define ESTSYSNAME  "Windows (VC++)"
+#define TTSYSNAME   "Windows (VC++)"
 
 #elif defined(_WIN32)
 
 #define _SYS_MINGW_
-#define ESTSYSNAME  "Windows (MinGW)"
+#define TTSYSNAME   "Windows (MinGW)"
 
 #elif defined(__CYGWIN__)
 
 #define _SYS_CYGWIN_
-#define ESTSYSNAME  "Windows (Cygwin)"
+#define TTSYSNAME   "Windows (Cygwin)"
 
 #else
 
 #define _SYS_GENERIC_
-#define ESTSYSNAME  "Generic"
+#define TTSYSNAME   "Generic"
 
 #endif
 
@@ -207,6 +207,8 @@
 #include <tcutil.h>
 #include <tchdb.h>
 #include <tcbdb.h>
+#include <tcfdb.h>
+#include <tctdb.h>
 #include <tcadb.h>
 
 #if defined(_SYS_FREEBSD_) || defined(_SYS_MACOSX_)
@@ -224,6 +226,10 @@
 
 
 #define sizeof(a)      ((int)sizeof(a))
+
+#if defined(_SYS_FREEBSD_) || defined(_SYS_NETBSD_) || defined(_SYS_OPENBSD_)
+#define nan(TC_a)      strtod("nan", NULL)
+#endif
 
 int _tt_dummyfunc(void);
 int _tt_dummyfuncv(int a, ...);

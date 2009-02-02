@@ -31,7 +31,9 @@ const char *g_progname;                  // program name
 int main(int argc, char **argv);
 static void usage(void);
 static void printerr(TCRDB *rdb);
-static int printdata(const char *ptr, int size, bool px);
+static int sepstrtochr(const char *str);
+static char *strtozsv(const char *str, int sep, int *sp);
+static int printdata(const char *ptr, int size, bool px, int sep);
 static char *hextoobj(const char *str, int *sp);
 static char *mygetline(FILE *ifp);
 static int runinform(int argc, char **argv);
@@ -55,16 +57,19 @@ static int procinform(const char *host, int port, bool st);
 static int procput(const char *host, int port, const char *kbuf, int ksiz,
                    const char *vbuf, int vsiz, int dmode);
 static int procout(const char *host, int port, const char *kbuf, int ksiz);
-static int procget(const char *host, int port, const char *kbuf, int ksiz, bool px, bool pz);
-static int procmget(const char *host, int port, const TCLIST *keys, bool px);
-static int proclist(const char *host, int port, int max, bool pv, bool px, const char *fmstr);
+static int procget(const char *host, int port, const char *kbuf, int ksiz, int sep,
+                   bool px, bool pz);
+static int procmget(const char *host, int port, const TCLIST *keys, int sep, bool px);
+static int proclist(const char *host, int port, int sep, int max, bool pv, bool px,
+                    const char *fmstr);
 static int procext(const char *host, int port, const char *func, int opts,
-                   const char *kbuf, int ksiz, const char *vbuf, int vsiz, bool px, bool pz);
+                   const char *kbuf, int ksiz, const char *vbuf, int vsiz, int sep,
+                   bool px, bool pz);
 static int procsync(const char *host, int port);
 static int procvanish(const char *host, int port);
 static int proccopy(const char *host, int port, const char *dpath);
 static int procmisc(const char *host, int port, const char *func, int opts,
-                    const TCLIST *args, bool px);
+                    const TCLIST *args, int sep, bool px);
 static int procimporttsv(const char *host, int port, const char *file, bool nr, bool sc);
 static int procrestore(const char *host, int port, const char *upath, uint64_t ts);
 static int procsetmst(const char *host, int port, const char *mhost, int mport);
@@ -126,17 +131,20 @@ static void usage(void){
   fprintf(stderr, "\n");
   fprintf(stderr, "usage:\n");
   fprintf(stderr, "  %s inform [-port num] [-st] host\n", g_progname);
-  fprintf(stderr, "  %s put [-port num] [-sx] [-dk|-dc] host key value\n", g_progname);
-  fprintf(stderr, "  %s out [-port num] [-sx] host key\n", g_progname);
-  fprintf(stderr, "  %s get [-port num] [-sx] [-px] [-pz] host key\n", g_progname);
-  fprintf(stderr, "  %s mget [-port num] [-sx] [-px] host [key...]\n", g_progname);
-  fprintf(stderr, "  %s list [-port num] [-m num] [-pv] [-px] [-fm str] host\n", g_progname);
-  fprintf(stderr, "  %s ext [-port num] [-xlr|-xlg] [-sx] [-px] host func [key [value]]\n",
+  fprintf(stderr, "  %s put [-port num] [-sx] [-sep chr] [-dk|-dc] host key value\n",
           g_progname);
+  fprintf(stderr, "  %s out [-port num] [-sx] [-sep chr] host key\n", g_progname);
+  fprintf(stderr, "  %s get [-port num] [-sx] [-sep chr] [-px] [-pz] host key\n", g_progname);
+  fprintf(stderr, "  %s mget [-port num] [-sx] [-sep chr] [-px] host [key...]\n", g_progname);
+  fprintf(stderr, "  %s list [-port num] [-sep chr] [-m num] [-pv] [-px] [-fm str] host\n",
+          g_progname);
+  fprintf(stderr, "  %s ext [-port num] [-xlr|-xlg] [-sx] [-sep chr] [-px] host func"
+          " [key [value]]\n", g_progname);
   fprintf(stderr, "  %s sync [-port num] host\n", g_progname);
   fprintf(stderr, "  %s vanish [-port num] host\n", g_progname);
   fprintf(stderr, "  %s copy [-port num] host dpath\n", g_progname);
-  fprintf(stderr, "  %s misc [-port num] [-mnu] host func [arg...]\n", g_progname);
+  fprintf(stderr, "  %s misc [-port num] [-mnu] [-sx] [-sep chr] [-px] host func [arg...]\n",
+          g_progname);
   fprintf(stderr, "  %s importtsv [-port num] [-nr] [-sc] host [file]\n", g_progname);
   fprintf(stderr, "  %s restore [-port num] [-ts num] host upath\n", g_progname);
   fprintf(stderr, "  %s setmst [-port num] [-mport num] host [mhost]\n", g_progname);
@@ -155,13 +163,41 @@ static void printerr(TCRDB *rdb){
 }
 
 
+/* get the character of separation string */
+static int sepstrtochr(const char *str){
+  if(!strcmp(str, "\\t")) return '\t';
+  if(!strcmp(str, "\\r")) return '\r';
+  if(!strcmp(str, "\\n")) return '\n';
+  return *(unsigned char *)str;
+}
+
+
+/* encode a string as a zero separaterd string */
+static char *strtozsv(const char *str, int sep, int *sp){
+ int size = strlen(str);
+ char *buf = tcmemdup(str, size);
+ for(int i = 0; i < size; i++){
+   if(buf[i] == sep) buf[i] = '\0';
+ }
+ *sp = size;
+ return buf;
+}
+
+
 /* print record data */
-static int printdata(const char *ptr, int size, bool px){
+static int printdata(const char *ptr, int size, bool px, int sep){
   int len = 0;
   while(size-- > 0){
     if(px){
       if(len > 0) putchar(' ');
       len += printf("%02X", *(unsigned char *)ptr);
+    } else if(sep > 0){
+      if(*ptr == '\0'){
+        putchar(sep);
+      } else {
+        putchar(*ptr);
+      }
+      len++;
     } else {
       putchar(*ptr);
       len++;
@@ -229,7 +265,7 @@ static int runinform(int argc, char **argv){
     if(!host && argv[i][0] == '-'){
       if(!strcmp(argv[i], "-port")){
         if(++i >= argc) usage();
-        port = atoi(argv[i]);
+        port = tcatoi(argv[i]);
       } else if(!strcmp(argv[i], "-st")){
         st = true;
       } else {
@@ -255,17 +291,21 @@ static int runput(int argc, char **argv){
   int port = DEFPORT;
   int dmode = 0;
   bool sx = false;
+  int sep = -1;
   for(int i = 2; i < argc; i++){
     if(!host && argv[i][0] == '-'){
       if(!strcmp(argv[i], "-port")){
         if(++i >= argc) usage();
-        port = atoi(argv[i]);
+        port = tcatoi(argv[i]);
       } else if(!strcmp(argv[i], "-dk")){
         dmode = -1;
       } else if(!strcmp(argv[i], "-dc")){
         dmode = 1;
       } else if(!strcmp(argv[i], "-sx")){
         sx = true;
+      } else if(!strcmp(argv[i], "-sep")){
+        if(++i >= argc) usage();
+        sep = sepstrtochr(argv[i]);
       } else {
         usage();
       }
@@ -285,6 +325,9 @@ static int runput(int argc, char **argv){
   if(sx){
     kbuf = hextoobj(key, &ksiz);
     vbuf = hextoobj(value, &vsiz);
+  } else if(sep > 0){
+    kbuf = strtozsv(key, sep, &ksiz);
+    vbuf = strtozsv(value, sep, &vsiz);
   } else {
     ksiz = strlen(key);
     kbuf = tcmemdup(key, ksiz);
@@ -304,13 +347,17 @@ static int runout(int argc, char **argv){
   char *key = NULL;
   int port = DEFPORT;
   bool sx = false;
+  int sep = -1;
   for(int i = 2; i < argc; i++){
     if(!host && argv[i][0] == '-'){
       if(!strcmp(argv[i], "-port")){
         if(++i >= argc) usage();
-        port = atoi(argv[i]);
+        port = tcatoi(argv[i]);
       } else if(!strcmp(argv[i], "-sx")){
         sx = true;
+      } else if(!strcmp(argv[i], "-sep")){
+        if(++i >= argc) usage();
+        sep = sepstrtochr(argv[i]);
       } else {
         usage();
       }
@@ -327,6 +374,8 @@ static int runout(int argc, char **argv){
   char *kbuf;
   if(sx){
     kbuf = hextoobj(key, &ksiz);
+  } else if(sep > 0){
+    kbuf = strtozsv(key, sep, &ksiz);
   } else {
     ksiz = strlen(key);
     kbuf = tcmemdup(key, ksiz);
@@ -343,15 +392,19 @@ static int runget(int argc, char **argv){
   char *key = NULL;
   int port = DEFPORT;
   bool sx = false;
+  int sep = -1;
   bool px = false;
   bool pz = false;
   for(int i = 2; i < argc; i++){
     if(!host && argv[i][0] == '-'){
       if(!strcmp(argv[i], "-port")){
         if(++i >= argc) usage();
-        port = atoi(argv[i]);
+        port = tcatoi(argv[i]);
       } else if(!strcmp(argv[i], "-sx")){
         sx = true;
+      } else if(!strcmp(argv[i], "-sep")){
+        if(++i >= argc) usage();
+        sep = sepstrtochr(argv[i]);
       } else if(!strcmp(argv[i], "-px")){
         px = true;
       } else if(!strcmp(argv[i], "-pz")){
@@ -372,11 +425,13 @@ static int runget(int argc, char **argv){
   char *kbuf;
   if(sx){
     kbuf = hextoobj(key, &ksiz);
+  } else if(sep > 0){
+    kbuf = strtozsv(key, sep, &ksiz);
   } else {
     ksiz = strlen(key);
     kbuf = tcmemdup(key, ksiz);
   }
-  int rv = procget(host, port, kbuf, ksiz, px, pz);
+  int rv = procget(host, port, kbuf, ksiz, sep, px, pz);
   tcfree(kbuf);
   return rv;
 }
@@ -388,14 +443,18 @@ static int runmget(int argc, char **argv){
   TCLIST *keys = tcmpoollistnew(tcmpoolglobal());
   int port = DEFPORT;
   bool sx = false;
+  int sep = -1;
   bool px = false;
   for(int i = 2; i < argc; i++){
     if(!host && argv[i][0] == '-'){
       if(!strcmp(argv[i], "-port")){
         if(++i >= argc) usage();
-        port = atoi(argv[i]);
+        port = tcatoi(argv[i]);
       } else if(!strcmp(argv[i], "-sx")){
         sx = true;
+      } else if(!strcmp(argv[i], "-sep")){
+        if(++i >= argc) usage();
+        sep = sepstrtochr(argv[i]);
       } else if(!strcmp(argv[i], "-px")){
         px = true;
       } else {
@@ -415,8 +474,15 @@ static int runmget(int argc, char **argv){
       tclistover(keys, i, kbuf, ksiz);
       tcfree(kbuf);
     }
+  } else if(sep > 0){
+    for(int i = 0; i < tclistnum(keys); i++){
+      int ksiz;
+      char *kbuf = strtozsv(tclistval2(keys, i), sep, &ksiz);
+      tclistover(keys, i, kbuf, ksiz);
+      tcfree(kbuf);
+    }
   }
-  int rv = procmget(host, port, keys, px);
+  int rv = procmget(host, port, keys, sep, px);
   return rv;
 }
 
@@ -425,6 +491,7 @@ static int runmget(int argc, char **argv){
 static int runlist(int argc, char **argv){
   char *host = NULL;
   int port = DEFPORT;
+  int sep = -1;
   int max = -1;
   bool pv = false;
   bool px = false;
@@ -433,10 +500,13 @@ static int runlist(int argc, char **argv){
     if(!host && argv[i][0] == '-'){
       if(!strcmp(argv[i], "-port")){
         if(++i >= argc) usage();
-        port = atoi(argv[i]);
+        port = tcatoi(argv[i]);
+      } else if(!strcmp(argv[i], "-sep")){
+        if(++i >= argc) usage();
+        sep = sepstrtochr(argv[i]);
       } else if(!strcmp(argv[i], "-m")){
         if(++i >= argc) usage();
-        max = atoi(argv[i]);
+        max = tcatoi(argv[i]);
       } else if(!strcmp(argv[i], "-pv")){
         pv = true;
       } else if(!strcmp(argv[i], "-px")){
@@ -454,7 +524,7 @@ static int runlist(int argc, char **argv){
     }
   }
   if(!host) usage();
-  int rv = proclist(host, port, max, pv, px, fmstr);
+  int rv = proclist(host, port, sep, max, pv, px, fmstr);
   return rv;
 }
 
@@ -468,19 +538,23 @@ static int runext(int argc, char **argv){
   int port = DEFPORT;
   int opts = 0;
   bool sx = false;
+  int sep = -1;
   bool px = false;
   bool pz = false;
   for(int i = 2; i < argc; i++){
     if(!host && argv[i][0] == '-'){
       if(!strcmp(argv[i], "-port")){
         if(++i >= argc) usage();
-        port = atoi(argv[i]);
+        port = tcatoi(argv[i]);
       } else if(!strcmp(argv[i], "-xlr")){
         opts |= RDBXOLCKREC;
       } else if(!strcmp(argv[i], "-xlg")){
         opts |= RDBXOLCKGLB;
       } else if(!strcmp(argv[i], "-sx")){
         sx = true;
+      } else if(!strcmp(argv[i], "-sep")){
+        if(++i >= argc) usage();
+        sep = sepstrtochr(argv[i]);
       } else if(!strcmp(argv[i], "-px")){
         px = true;
       } else if(!strcmp(argv[i], "-pz")){
@@ -508,13 +582,16 @@ static int runext(int argc, char **argv){
   if(sx){
     kbuf = hextoobj(key, &ksiz);
     vbuf = hextoobj(value, &vsiz);
+  } else if(sep > 0){
+    kbuf = strtozsv(key, sep, &ksiz);
+    vbuf = strtozsv(value, sep, &vsiz);
   } else {
     ksiz = strlen(key);
     kbuf = tcmemdup(key, ksiz);
     vsiz = strlen(value);
     vbuf = tcmemdup(value, vsiz);
   }
-  int rv = procext(host, port, func, opts, kbuf, ksiz, vbuf, vsiz, px, pz);
+  int rv = procext(host, port, func, opts, kbuf, ksiz, vbuf, vsiz, sep, px, pz);
   tcfree(vbuf);
   tcfree(kbuf);
   return rv;
@@ -529,7 +606,7 @@ static int runsync(int argc, char **argv){
     if(!host && argv[i][0] == '-'){
       if(!strcmp(argv[i], "-port")){
         if(++i >= argc) usage();
-        port = atoi(argv[i]);
+        port = tcatoi(argv[i]);
       } else {
         usage();
       }
@@ -553,7 +630,7 @@ static int runvanish(int argc, char **argv){
     if(!host && argv[i][0] == '-'){
       if(!strcmp(argv[i], "-port")){
         if(++i >= argc) usage();
-        port = atoi(argv[i]);
+        port = tcatoi(argv[i]);
       } else {
         usage();
       }
@@ -578,7 +655,7 @@ static int runcopy(int argc, char **argv){
     if(!host && argv[i][0] == '-'){
       if(!strcmp(argv[i], "-port")){
         if(++i >= argc) usage();
-        port = atoi(argv[i]);
+        port = tcatoi(argv[i]);
       } else {
         usage();
       }
@@ -604,16 +681,20 @@ static int runmisc(int argc, char **argv){
   int port = DEFPORT;
   int opts = 0;
   bool sx = false;
+  int sep = -1;
   bool px = false;
   for(int i = 2; i < argc; i++){
     if(!host && argv[i][0] == '-'){
       if(!strcmp(argv[i], "-port")){
         if(++i >= argc) usage();
-        port = atoi(argv[i]);
+        port = tcatoi(argv[i]);
       } else if(!strcmp(argv[i], "-mnu")){
         opts |= RDBMONOULOG;
       } else if(!strcmp(argv[i], "-sx")){
         sx = true;
+      } else if(!strcmp(argv[i], "-sep")){
+        if(++i >= argc) usage();
+        sep = sepstrtochr(argv[i]);
       } else if(!strcmp(argv[i], "-px")){
         px = true;
       } else {
@@ -629,13 +710,18 @@ static int runmisc(int argc, char **argv){
         char *buf = hextoobj(argv[i], &size);
         tclistpush(args, buf, size);
         tcfree(buf);
+      } else if(sep > 0){
+        int size;
+        char *buf = strtozsv(argv[i], sep, &size);
+        tclistpush(args, buf, size);
+        tcfree(buf);
       } else {
         tclistpush2(args, argv[i]);
       }
     }
   }
   if(!host || !func) usage();
-  int rv = procmisc(host, port, func, opts, args, px);
+  int rv = procmisc(host, port, func, opts, args, sep, px);
   return rv;
 }
 
@@ -651,7 +737,7 @@ static int runimporttsv(int argc, char **argv){
     if(!host && argv[i][0] == '-'){
       if(!strcmp(argv[i], "-port")){
         if(++i >= argc) usage();
-        port = atoi(argv[i]);
+        port = tcatoi(argv[i]);
       } else if(!strcmp(argv[i], "-nr")){
         nr = true;
       } else if(!strcmp(argv[i], "-sc")){
@@ -683,7 +769,7 @@ static int runrestore(int argc, char **argv){
     if(!host && argv[i][0] == '-'){
       if(!strcmp(argv[i], "-port")){
         if(++i >= argc) usage();
-        port = atoi(argv[i]);
+        port = tcatoi(argv[i]);
       } else if(!strcmp(argv[i], "-ts")){
         if(++i >= argc) usage();
         ts = strtoll(argv[i], NULL, 10);
@@ -714,10 +800,10 @@ static int runsetmst(int argc, char **argv){
     if(!host && argv[i][0] == '-'){
       if(!strcmp(argv[i], "-port")){
         if(++i >= argc) usage();
-        port = atoi(argv[i]);
+        port = tcatoi(argv[i]);
       } else if(!strcmp(argv[i], "-mport")){
         if(++i >= argc) usage();
-        mport = atoi(argv[i]);
+        mport = tcatoi(argv[i]);
       } else {
         usage();
       }
@@ -746,13 +832,13 @@ static int runrepl(int argc, char **argv){
     if(!host && argv[i][0] == '-'){
       if(!strcmp(argv[i], "-port")){
         if(++i >= argc) usage();
-        port = atoi(argv[i]);
+        port = tcatoi(argv[i]);
       } else if(!strcmp(argv[i], "-ts")){
         if(++i >= argc) usage();
         ts = strtoll(argv[i], NULL, 10);
       } else if(!strcmp(argv[i], "-sid")){
         if(++i >= argc) usage();
-        sid = atoi(argv[i]);
+        sid = tcatoi(argv[i]);
       } else if(!strcmp(argv[i], "-ph")){
         ph = true;
       } else {
@@ -913,7 +999,8 @@ static int procout(const char *host, int port, const char *kbuf, int ksiz){
 
 
 /* perform get command */
-static int procget(const char *host, int port, const char *kbuf, int ksiz, bool px, bool pz){
+static int procget(const char *host, int port, const char *kbuf, int ksiz, int sep,
+                   bool px, bool pz){
   TCRDB *rdb = tcrdbnew();
   if(!tcrdbopen(rdb, host, port)){
     printerr(rdb);
@@ -924,7 +1011,7 @@ static int procget(const char *host, int port, const char *kbuf, int ksiz, bool 
   int vsiz;
   char *vbuf = tcrdbget(rdb, kbuf, ksiz, &vsiz);
   if(vbuf){
-    printdata(vbuf, vsiz, px);
+    printdata(vbuf, vsiz, px, sep);
     if(!pz) putchar('\n');
     tcfree(vbuf);
   } else {
@@ -941,7 +1028,7 @@ static int procget(const char *host, int port, const char *kbuf, int ksiz, bool 
 
 
 /* perform mget command */
-static int procmget(const char *host, int port, const TCLIST *keys, bool px){
+static int procmget(const char *host, int port, const TCLIST *keys, int sep, bool px){
   TCRDB *rdb = tcrdbnew();
   if(!tcrdbopen(rdb, host, port)){
     printerr(rdb);
@@ -962,9 +1049,9 @@ static int procmget(const char *host, int port, const TCLIST *keys, bool px){
     while((kbuf = tcmapiternext(recs, &ksiz)) != NULL){
       int vsiz;
       const char *vbuf = tcmapiterval(kbuf, &vsiz);
-      printdata(kbuf, ksiz, px);
+      printdata(kbuf, ksiz, px, sep);
       putchar('\t');
-      printdata(vbuf, vsiz, px);
+      printdata(vbuf, vsiz, px, sep);
       putchar('\n');
     }
   } else {
@@ -982,7 +1069,8 @@ static int procmget(const char *host, int port, const TCLIST *keys, bool px){
 
 
 /* perform list command */
-static int proclist(const char *host, int port, int max, bool pv, bool px, const char *fmstr){
+static int proclist(const char *host, int port, int sep, int max, bool pv, bool px,
+                    const char *fmstr){
   TCRDB *rdb = tcrdbnew();
   if(!tcrdbopen(rdb, host, port)){
     printerr(rdb);
@@ -995,13 +1083,13 @@ static int proclist(const char *host, int port, int max, bool pv, bool px, const
     for(int i = 0; i < tclistnum(keys); i++){
       int ksiz;
       const char *kbuf = tclistval(keys, i, &ksiz);
-      printdata(kbuf, ksiz, px);
+      printdata(kbuf, ksiz, px, sep);
       if(pv){
         int vsiz;
         char *vbuf = tcrdbget(rdb, kbuf, ksiz, &vsiz);
         if(vbuf){
           putchar('\t');
-          printdata(vbuf, vsiz, px);
+          printdata(vbuf, vsiz, px, sep);
           tcfree(vbuf);
         }
       }
@@ -1017,13 +1105,13 @@ static int proclist(const char *host, int port, int max, bool pv, bool px, const
     char *kbuf;
     int cnt = 0;
     while((kbuf = tcrdbiternext(rdb, &ksiz)) != NULL){
-      printdata(kbuf, ksiz, px);
+      printdata(kbuf, ksiz, px, sep);
       if(pv){
         int vsiz;
         char *vbuf = tcrdbget(rdb, kbuf, ksiz, &vsiz);
         if(vbuf){
           putchar('\t');
-          printdata(vbuf, vsiz, px);
+          printdata(vbuf, vsiz, px, sep);
           tcfree(vbuf);
         }
       }
@@ -1043,7 +1131,8 @@ static int proclist(const char *host, int port, int max, bool pv, bool px, const
 
 /* perform ext command */
 static int procext(const char *host, int port, const char *name, int opts,
-                   const char *kbuf, int ksiz, const char *vbuf, int vsiz, bool px, bool pz){
+                   const char *kbuf, int ksiz, const char *vbuf, int vsiz, int sep,
+                   bool px, bool pz){
   TCRDB *rdb = tcrdbnew();
   if(!tcrdbopen(rdb, host, port)){
     printerr(rdb);
@@ -1054,7 +1143,7 @@ static int procext(const char *host, int port, const char *name, int opts,
   int xsiz;
   char *xbuf = tcrdbext(rdb, name, opts, kbuf, ksiz, vbuf, vsiz, &xsiz);
   if(xbuf){
-    printdata(xbuf, xsiz, px);
+    printdata(xbuf, xsiz, px, sep);
     if(!pz) putchar('\n');
     tcfree(xbuf);
   } else {
@@ -1138,7 +1227,7 @@ static int proccopy(const char *host, int port, const char *dpath){
 
 /* perform misc command */
 static int procmisc(const char *host, int port, const char *func, int opts,
-                    const TCLIST *args, bool px){
+                    const TCLIST *args, int sep, bool px){
   TCRDB *rdb = tcrdbnew();
   if(!tcrdbopen(rdb, host, port)){
     printerr(rdb);
@@ -1151,7 +1240,7 @@ static int procmisc(const char *host, int port, const char *func, int opts,
     for(int i = 0; i < tclistnum(res); i++){
       int rsiz;
       const char *rbuf = tclistval(res, i, &rsiz);
-      printdata(rbuf, rsiz, px);
+      printdata(rbuf, rsiz, px, sep);
       printf("\n");
     }
     tclistdel(res);
@@ -1281,7 +1370,7 @@ static int procrepl(const char *host, int port, uint64_t ts, uint32_t sid, bool 
       if(rsiz < 1) continue;
       if(ph){
         printf("%llu\t%u\t", (unsigned long long)rts, (unsigned int)rsid);
-        printdata(rbuf, rsiz, true);
+        printdata(rbuf, rsiz, true, -1);
         putchar('\n');
       } else {
         int msiz = sizeof(uint8_t) + sizeof(uint64_t) + sizeof(uint32_t) * 2 + rsiz;
@@ -1353,7 +1442,8 @@ static int prochttp(const char *url, TCMAP *hmap, bool ih){
 
 /* perform version command */
 static int procversion(void){
-  printf("Tokyo Tyrant version %s (%d:%s)\n", ttversion, _TT_LIBVER, _TT_PROTVER);
+  printf("Tokyo Tyrant version %s (%d:%s) for %s\n",
+         ttversion, _TT_LIBVER, _TT_PROTVER, TTSYSNAME);
   printf("Copyright (C) 2007-2009 Mikio Hirabayashi\n");
   return 0;
 }

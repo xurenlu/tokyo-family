@@ -116,7 +116,7 @@ static int runwrite(int argc, char **argv){
     }
   }
   if(!base || !rstr) usage();
-  int rnum = atoi(rstr);
+  int rnum = tcatoi(rstr);
   if(rnum < 1) usage();
   int rv = procwrite(base, rnum, limsiz, as);
   return rv;
@@ -178,8 +178,8 @@ static int runthread(int argc, char **argv){
     }
   }
   if(!base || !tstr || !rstr) usage();
-  int tnum = atoi(tstr);
-  int rnum = atoi(rstr);
+  int tnum = tcatoi(tstr);
+  int rnum = tcatoi(rstr);
   if(tnum < 1 || rnum < 1) usage();
   int rv = procthread(base, tnum, rnum, limsiz, as);
   return rv;

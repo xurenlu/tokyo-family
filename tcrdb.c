@@ -14,6 +14,8 @@
  *************************************************************************************************/
 
 
+#include "tcutil.h"
+#include "tcadb.h"
 #include "ttutil.h"
 #include "tcrdb.h"
 #include "myconf.h"
@@ -1200,6 +1202,225 @@ TCLIST *tcrdbmisc(TCRDB *rdb, const char *name, int opts, const TCLIST *args){
     res = NULL;
   }
   return res;
+}
+
+
+
+/*************************************************************************************************
+ * table extension
+ *************************************************************************************************/
+
+
+/* Store a record into a remote database object. */
+bool tcrdbtblput(TCRDB *rdb, const void *pkbuf, int pksiz, TCMAP *cols){
+  assert(rdb && pkbuf && pksiz >= 0 && cols);
+  TCLIST *args = tclistnew2(tcmaprnum(cols) * 2 + 1);
+  tclistpush(args, pkbuf, pksiz);
+  tcmapiterinit(cols);
+  const char *kbuf;
+  int ksiz;
+  while((kbuf = tcmapiternext(cols, &ksiz)) != NULL){
+    int vsiz;
+    const char *vbuf = tcmapiterval(kbuf, &vsiz);
+    tclistpush(args, kbuf, ksiz);
+    tclistpush(args, vbuf, vsiz);
+  }
+  TCLIST *rv = tcrdbmisc(rdb, "put", 0, args);
+  tclistdel(args);
+  if(!rv) return false;
+  tclistdel(rv);
+  return true;
+}
+
+
+/* Store a new record into a remote database object. */
+bool tcrdbtblputkeep(TCRDB *rdb, const void *pkbuf, int pksiz, TCMAP *cols){
+  assert(rdb && pkbuf && pksiz >= 0 && cols);
+  TCLIST *args = tclistnew2(tcmaprnum(cols) * 2 + 1);
+  tclistpush(args, pkbuf, pksiz);
+  tcmapiterinit(cols);
+  const char *kbuf;
+  int ksiz;
+  while((kbuf = tcmapiternext(cols, &ksiz)) != NULL){
+    int vsiz;
+    const char *vbuf = tcmapiterval(kbuf, &vsiz);
+    tclistpush(args, kbuf, ksiz);
+    tclistpush(args, vbuf, vsiz);
+  }
+  TCLIST *rv = tcrdbmisc(rdb, "putkeep", 0, args);
+  tclistdel(args);
+  if(!rv) return false;
+  tclistdel(rv);
+  return true;
+}
+
+
+/* Concatenate columns of the existing record in a remote database object. */
+bool tcrdbtblputcat(TCRDB *rdb, const void *pkbuf, int pksiz, TCMAP *cols){
+  assert(rdb && pkbuf && pksiz >= 0 && cols);
+  TCLIST *args = tclistnew2(tcmaprnum(cols) * 2 + 1);
+  tclistpush(args, pkbuf, pksiz);
+  tcmapiterinit(cols);
+  const char *kbuf;
+  int ksiz;
+  while((kbuf = tcmapiternext(cols, &ksiz)) != NULL){
+    int vsiz;
+    const char *vbuf = tcmapiterval(kbuf, &vsiz);
+    tclistpush(args, kbuf, ksiz);
+    tclistpush(args, vbuf, vsiz);
+  }
+  TCLIST *rv = tcrdbmisc(rdb, "putcat", 0, args);
+  tclistdel(args);
+  if(!rv) return false;
+  tclistdel(rv);
+  return true;
+}
+
+
+/* Remove a record of a remote database object. */
+bool tcrdbtblout(TCRDB *rdb, const void *pkbuf, int pksiz){
+  assert(rdb && pkbuf && pksiz >= 0);
+  TCLIST *args = tclistnew2(1);
+  tclistpush(args, pkbuf, pksiz);
+  TCLIST *rv = tcrdbmisc(rdb, "out", 0, args);
+  tclistdel(args);
+  if(!rv) return false;
+  tclistdel(rv);
+  return true;
+}
+
+
+/* Retrieve a record in a remote database object. */
+TCMAP *tcrdbtblget(TCRDB *rdb, const void *pkbuf, int pksiz){
+  assert(rdb && pkbuf && pksiz >= 0);
+  TCLIST *args = tclistnew2(1);
+  tclistpush(args, pkbuf, pksiz);
+  TCLIST *rv = tcrdbmisc(rdb, "get", RDBMONOULOG, args);
+  tclistdel(args);
+  if(!rv) return false;
+  int num = tclistnum(rv);
+  TCMAP *cols = tcmapnew2(num / 2 + 1);
+  num--;
+  for(int i = 0; i < num; i += 2){
+    int ksiz;
+    const char *kbuf = tclistval(rv, i, &ksiz);
+    int vsiz;
+    const char *vbuf = tclistval(rv, i + 1, &vsiz);
+    tcmapput(cols, kbuf, ksiz, vbuf, vsiz);
+  }
+  tclistdel(rv);
+  return cols;
+}
+
+
+/* Set a column index to a remote database object. */
+bool tcrdbtblsetindex(TCRDB *rdb, const char *name, int type){
+  assert(rdb && name);
+  TCLIST *args = tclistnew2(2);
+  tclistpush2(args, name);
+  char typestr[TTNUMBUFSIZ];
+  sprintf(typestr, "%d", type);
+  tclistpush2(args, typestr);
+  TCLIST *rv = tcrdbmisc(rdb, "setindex", 0, args);
+  tclistdel(args);
+  if(!rv) return false;
+  tclistdel(rv);
+  return true;
+}
+
+
+/* Generate a unique ID number of a remote database object. */
+int64_t tcrdbtblgenuid(TCRDB *rdb){
+  assert(rdb);
+  TCLIST *args = tclistnew2(1);
+  TCLIST *rv = tcrdbmisc(rdb, "genuid", 0, args);
+  tclistdel(args);
+  if(!rv) return false;
+  int64_t uid = -1;
+  if(tclistnum(rv) > 0) uid = tcatoi(tclistval2(rv, 0));
+  tclistdel(rv);
+  return uid;
+}
+
+
+/* Create a query object. */
+RDBQRY *tcrdbqrynew(TCRDB *rdb){
+  assert(rdb);
+  RDBQRY *qry = tcmalloc(sizeof(*qry));
+  qry->rdb = rdb;
+  qry->args = tclistnew();
+  return qry;
+}
+
+
+/* Delete a query object. */
+void tcrdbqrydel(RDBQRY *qry){
+  assert(qry);
+  tclistdel(qry->args);
+  tcfree(qry);
+}
+
+
+/* Add a narrowing condition to a query object. */
+void tcrdbqryaddcond(RDBQRY *qry, const char *name, int op, const char *expr){
+  assert(qry && name && expr);
+  TCXSTR *xstr = tcxstrnew();
+  tcxstrcat2(xstr, "addcond");
+  tcxstrcat(xstr, "\0", 1);
+  tcxstrcat2(xstr, name);
+  tcxstrcat(xstr, "\0", 1);
+  tcxstrprintf(xstr, "%d", op);
+  tcxstrcat(xstr, "\0", 1);
+  tcxstrcat2(xstr, expr);
+  tclistpush(qry->args, tcxstrptr(xstr), tcxstrsize(xstr));
+  tcxstrdel(xstr);
+}
+
+
+/* Set the order of a query object. */
+void tcrdbqrysetorder(RDBQRY *qry, const char *name, int type){
+  assert(qry && name);
+  TCXSTR *xstr = tcxstrnew();
+  tcxstrcat2(xstr, "setorder");
+  tcxstrcat(xstr, "\0", 1);
+  tcxstrcat2(xstr, name);
+  tcxstrcat(xstr, "\0", 1);
+  tcxstrprintf(xstr, "%d", type);
+  tclistpush(qry->args, tcxstrptr(xstr), tcxstrsize(xstr));
+  tcxstrdel(xstr);
+}
+
+
+/* Set the maximum number of records of the result of a query object. */
+void tcrdbqrysetmax(RDBQRY *qry, int max){
+  TCXSTR *xstr = tcxstrnew();
+  tcxstrcat2(xstr, "setmax");
+  tcxstrcat(xstr, "\0", 1);
+  tcxstrprintf(xstr, "%d", max);
+  tclistpush(qry->args, tcxstrptr(xstr), tcxstrsize(xstr));
+  tcxstrdel(xstr);
+}
+
+
+/* Execute the search of a query object. */
+TCLIST *tcrdbqrysearch(RDBQRY *qry){
+  assert(qry);
+  TCLIST *rv = tcrdbmisc(qry->rdb, "search", RDBMONOULOG, qry->args);
+  if(!rv) tclistnew2(1);
+  return rv;
+}
+
+
+/* Remove each record corresponding to a query object. */
+bool tcrdbqrysearchout(RDBQRY *qry){
+  assert(qry);
+  TCLIST *args = tclistdup(qry->args);
+  tclistpush2(args, "out");
+  TCLIST *rv = tcrdbmisc(qry->rdb, "searchout", 0, args);
+  tclistdel(args);
+  if(!rv) return false;
+  tclistdel(rv);
+  return true;
 }
 
 

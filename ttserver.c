@@ -185,13 +185,13 @@ int main(int argc, char **argv){
         host = argv[i];
       } else if(!strcmp(argv[i], "-port")){
         if(++i >= argc) usage();
-        port = atoi(argv[i]);
+        port = tcatoi(argv[i]);
       } else if(!strcmp(argv[i], "-thnum")){
         if(++i >= argc) usage();
-        thnum = atoi(argv[i]);
+        thnum = tcatoi(argv[i]);
       } else if(!strcmp(argv[i], "-tout")){
         if(++i >= argc) usage();
-        tout = atoi(argv[i]);
+        tout = tcatoi(argv[i]);
       } else if(!strcmp(argv[i], "-dmn")){
         dmn = true;
       } else if(!strcmp(argv[i], "-pid")){
@@ -209,18 +209,18 @@ int main(int argc, char **argv){
         ulogpath = argv[i];
       } else if(!strcmp(argv[i], "-ulim")){
         if(++i >= argc) usage();
-        ulim = tcatoi(argv[i]);
+        ulim = tcatoix(argv[i]);
       } else if(!strcmp(argv[i], "-uas")){
         uas = true;
       } else if(!strcmp(argv[i], "-sid")){
         if(++i >= argc) usage();
-        sid = atoi(argv[i]);
+        sid = tcatoi(argv[i]);
       } else if(!strcmp(argv[i], "-mhost")){
         if(++i >= argc) usage();
         mhost = argv[i];
       } else if(!strcmp(argv[i], "-mport")){
         if(++i >= argc) usage();
-        mport = atoi(argv[i]);
+        mport = tcatoi(argv[i]);
       } else if(!strcmp(argv[i], "-rts")){
         if(++i >= argc) usage();
         rtspath = argv[i];
@@ -234,7 +234,8 @@ int main(int argc, char **argv){
         if(++i >= argc) usage();
         mask &= ~getcmdmask(argv[i]);
       } else if(!strcmp(argv[i], "--version")){
-        printf("Tokyo Tyrant version %s (%d:%s)\n", ttversion, _TT_LIBVER, _TT_PROTVER);
+        printf("Tokyo Tyrant version %s (%d:%s) for %s\n",
+               ttversion, _TT_LIBVER, _TT_PROTVER, TTSYSNAME);
         printf("Copyright (C) 2006-2009 Mikio Hirabayashi\n");
         exit(0);
       } else {
@@ -385,16 +386,46 @@ static int proc(const char *dbname, const char *host, int port, int thnum, int t
   LOGARG larg;
   larg.fd = 1;
   ttservsetloghandler(g_serv, do_log, &larg);
+  if(dmn){
+    if(dbname && *dbname != '*' && *dbname != '+' && *dbname != MYPATHCHR)
+      ttservlog(g_serv, TTLOGINFO, "warning: dbname(%s) is not the absolute path", dbname);
+    if(port == 0 && host && *host != MYPATHCHR)
+      ttservlog(g_serv, TTLOGINFO, "warning: host(%s) is not the absolute path", host);
+    if(pidpath && *pidpath != MYPATHCHR)
+      ttservlog(g_serv, TTLOGINFO, "warning: pid(%s) is not the absolute path", pidpath);
+    if(logpath && *logpath != MYPATHCHR)
+      ttservlog(g_serv, TTLOGINFO, "warning: log(%s) is not the absolute path", logpath);
+    if(ulogpath && *ulogpath != MYPATHCHR)
+      ttservlog(g_serv, TTLOGINFO, "warning: ulog(%s) is not the absolute path", ulogpath);
+    if(mport == 0 && mhost && *mhost != MYPATHCHR)
+      ttservlog(g_serv, TTLOGINFO, "warning: mhost(%s) is not the absolute path", mhost);
+    if(rtspath && *rtspath != MYPATHCHR)
+      ttservlog(g_serv, TTLOGINFO, "warning: rts(%s) is not the absolute path", rtspath);
+    if(extpath && *extpath != MYPATHCHR)
+      ttservlog(g_serv, TTLOGINFO, "warning: ext(%s) is not the absolute path", extpath);
+    if(chdir("/") == -1){
+      ttservlog(g_serv, TTLOGERROR, "chdir failed");
+      return 1;
+    }
+  }
+  if(dbname && *dbname != '*' && *dbname != '+' && !strstr(dbname, ".tc"))
+    ttservlog(g_serv, TTLOGINFO, "warning: dbname(%s) has no suffix for database type", dbname);
+  struct stat sbuf;
+  if(ulogpath && (stat(ulogpath, &sbuf) != 0 || !S_ISDIR(sbuf.st_mode)))
+    ttservlog(g_serv, TTLOGINFO, "warning: ulog(%s) is not a directory", ulogpath);
   if(pidpath){
     char *numstr = tcreadfile(pidpath, -1, NULL);
     if(numstr){
-      int pid = atoi(numstr);
+      int pid = tcatoi(numstr);
       tcfree(numstr);
       ttservlog(g_serv, TTLOGERROR, "process %d may be already running", pid);
       return 1;
     }
   }
-  if(dmn && !ttdaemonize()) return 1;
+  if(dmn && !ttdaemonize()){
+    ttservlog(g_serv, TTLOGERROR, "ttdaemonize failed");
+    return 1;
+  }
   if(logpath){
     int fd = open(logpath, O_WRONLY | O_APPEND | O_CREAT, 00644);
     if(fd != -1){
@@ -754,7 +785,7 @@ static void do_task(TTSOCK *sock, void *opq, TTREQ *req){
         } else if(!strcmp(cmd, "quit")){
           do_mc_quit(sock, arg, req, tokens, tnum);
         } else if(tnum > 2 && tcstrfwm(tokens[2], "HTTP/1.")){
-          int ver = atoi(tokens[2] + 7);
+          int ver = tcatoi(tokens[2] + 7);
           const char *uri = tokens[1];
           if(tcstrifwm(uri, "http://")){
             const char *pv = strchr(uri + 7, '/');
@@ -1749,6 +1780,15 @@ static void do_stat(TTSOCK *sock, TASKARG *arg, TTREQ *req){
     wp += sprintf(wp, "time\t%.6f\n", now);
     wp += sprintf(wp, "pid\t%d\n", getpid());
     wp += sprintf(wp, "sid\t%d\n", arg->sid);
+    switch(tcadbomode(adb)){
+    case ADBOVOID: wp += sprintf(wp, "type\tvoid\n"); break;
+    case ADBOMDB: wp += sprintf(wp, "type\ton-memory hash\n"); break;
+    case ADBONDB: wp += sprintf(wp, "type\ton-memory tree\n"); break;
+    case ADBOHDB: wp += sprintf(wp, "type\thash\n"); break;
+    case ADBOBDB: wp += sprintf(wp, "type\tB+ tree\n"); break;
+    case ADBOFDB: wp += sprintf(wp, "type\tfixed-length\n"); break;
+    case ADBOTDB: wp += sprintf(wp, "type\ttable\n"); break;
+    }
     wp += sprintf(wp, "rnum\t%llu\n", (unsigned long long)tcadbrnum(adb));
     wp += sprintf(wp, "size\t%llu\n", (unsigned long long)tcadbsize(adb));
     wp += sprintf(wp, "bigend\t%d\n", TTBIGEND);
@@ -1934,7 +1974,7 @@ static void do_mc_set(TTSOCK *sock, TASKARG *arg, TTREQ *req, char **tokens, int
   bool nr = tnum > 5 && !strcmp(tokens[5], "noreply");
   const char *kbuf = tokens[1];
   int ksiz = strlen(kbuf);
-  int vsiz = tclmax(atoi(tokens[4]), 0);
+  int vsiz = tclmax(tcatoi(tokens[4]), 0);
   char stack[TTIOBUFSIZ];
   char *vbuf = (vsiz < TTIOBUFSIZ) ? stack : tcmalloc(vsiz + 1);
   pthread_cleanup_push(free, (vbuf == stack) ? NULL : vbuf);
@@ -1976,7 +2016,7 @@ static void do_mc_add(TTSOCK *sock, TASKARG *arg, TTREQ *req, char **tokens, int
   bool nr = tnum > 5 && !strcmp(tokens[5], "noreply");
   const char *kbuf = tokens[1];
   int ksiz = strlen(kbuf);
-  int vsiz = tclmax(atoi(tokens[4]), 0);
+  int vsiz = tclmax(tcatoi(tokens[4]), 0);
   char stack[TTIOBUFSIZ];
   char *vbuf = (vsiz < TTIOBUFSIZ) ? stack : tcmalloc(vsiz + 1);
   pthread_cleanup_push(free, (vbuf == stack) ? NULL : vbuf);
@@ -2017,7 +2057,7 @@ static void do_mc_replace(TTSOCK *sock, TASKARG *arg, TTREQ *req, char **tokens,
   bool nr = tnum > 5 && !strcmp(tokens[5], "noreply");
   const char *kbuf = tokens[1];
   int ksiz = strlen(kbuf);
-  int vsiz = tclmax(atoi(tokens[4]), 0);
+  int vsiz = tclmax(tcatoi(tokens[4]), 0);
   char stack[TTIOBUFSIZ];
   char *vbuf = (vsiz < TTIOBUFSIZ) ? stack : tcmalloc(vsiz + 1);
   pthread_cleanup_push(free, (vbuf == stack) ? NULL : vbuf);
@@ -2457,9 +2497,9 @@ static void do_http_put(TTSOCK *sock, TASKARG *arg, TTREQ *req, int ver, const c
         keep = true;
       }
     } else if(!tcstricmp(line, "content-length")){
-      vsiz = atoi(pv);
+      vsiz = tcatoi(pv);
     } else if(!tcstricmp(line, "x-tt-pdmode")){
-      pdmode = atoi(pv);
+      pdmode = tcatoi(pv);
     }
   }
   if(*uri == '/') uri++;
@@ -2576,12 +2616,12 @@ static void do_http_post(TTSOCK *sock, TASKARG *arg, TTREQ *req, int ver, const 
         keep = true;
       }
     } else if(!tcstricmp(line, "content-length")){
-      vsiz = atoi(pv);
+      vsiz = tcatoi(pv);
     } else if(!tcstricmp(line, "x-tt-xname")){
       snprintf(name, sizeof(name), "%s", pv);
       name[sizeof(name)-1] = '\0';
     } else if(!tcstricmp(line, "x-tt-xopts")){
-      opts = atoi(pv);
+      opts = tcatoi(pv);
     }
   }
   if(*uri == '/') uri++;

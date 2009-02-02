@@ -38,6 +38,7 @@ static int runremove(int argc, char **argv);
 static int runrcat(int argc, char **argv);
 static int runmisc(int argc, char **argv);
 static int runwicked(int argc, char **argv);
+static int runtable(int argc, char **argv);
 static int procwrite(const char *host, int port, int cnum, int rnum, bool nr, bool rnd);
 static int procread(const char *host, int port, int cnum, int mul, bool rnd);
 static int procremove(const char *host, int port, int cnum, bool rnd);
@@ -45,6 +46,7 @@ static int procrcat(const char *host, int port, int cnum, int rnum,
                     int shl, bool dai, bool dad, const char *ext, int xopts);
 static int procmisc(const char *host, int port, int cnum, int rnum);
 static int procwicked(const char *host, int port, int cnum, int rnum);
+static int proctable(const char *host, int port, int cnum, int rnum);
 
 
 /* main routine */
@@ -66,6 +68,8 @@ int main(int argc, char **argv){
     rv = runmisc(argc, argv);
   } else if(!strcmp(argv[1], "wicked")){
     rv = runwicked(argc, argv);
+  } else if(!strcmp(argv[1], "table")){
+    rv = runtable(argc, argv);
   } else {
     usage();
   }
@@ -85,6 +89,7 @@ static void usage(void){
           " [-ext name] [-xlr|-xlg] host rnum\n", g_progname);
   fprintf(stderr, "  %s misc [-port num] [-cnum num] host rnum\n", g_progname);
   fprintf(stderr, "  %s wicked [-port num] [-cnum num] host rnum\n", g_progname);
+  fprintf(stderr, "  %s table [-port num] [-cnum num] host rnum\n", g_progname);
   fprintf(stderr, "\n");
   exit(1);
 }
@@ -132,10 +137,10 @@ static int runwrite(int argc, char **argv){
     if(!host && argv[i][0] == '-'){
       if(!strcmp(argv[i], "-port")){
         if(++i >= argc) usage();
-        port = atoi(argv[i]);
+        port = tcatoi(argv[i]);
       } else if(!strcmp(argv[i], "-cnum")){
         if(++i >= argc) usage();
-        cnum = atoi(argv[i]);
+        cnum = tcatoi(argv[i]);
       } else if(!strcmp(argv[i], "-nr")){
         nr = true;
       } else if(!strcmp(argv[i], "-rnd")){
@@ -152,7 +157,7 @@ static int runwrite(int argc, char **argv){
     }
   }
   if(!host || !rstr || cnum < 1) usage();
-  int rnum = atoi(rstr);
+  int rnum = tcatoi(rstr);
   if(rnum < 1) usage();
   int rv = procwrite(host, port, cnum, rnum, nr, rnd);
   return rv;
@@ -170,13 +175,13 @@ static int runread(int argc, char **argv){
     if(!host && argv[i][0] == '-'){
       if(!strcmp(argv[i], "-port")){
         if(++i >= argc) usage();
-        port = atoi(argv[i]);
+        port = tcatoi(argv[i]);
       } else if(!strcmp(argv[i], "-cnum")){
         if(++i >= argc) usage();
-        cnum = atoi(argv[i]);
+        cnum = tcatoi(argv[i]);
       } else if(!strcmp(argv[i], "-mul")){
         if(++i >= argc) usage();
-        mul = atoi(argv[i]);
+        mul = tcatoi(argv[i]);
       } else if(!strcmp(argv[i], "-rnd")){
         rnd = true;
       } else {
@@ -204,10 +209,10 @@ static int runremove(int argc, char **argv){
     if(!host && argv[i][0] == '-'){
       if(!strcmp(argv[i], "-port")){
         if(++i >= argc) usage();
-        port = atoi(argv[i]);
+        port = tcatoi(argv[i]);
       } else if(!strcmp(argv[i], "-cnum")){
         if(++i >= argc) usage();
-        cnum = atoi(argv[i]);
+        cnum = tcatoi(argv[i]);
       } else if(!strcmp(argv[i], "-rnd")){
         rnd = true;
       } else {
@@ -240,13 +245,13 @@ static int runrcat(int argc, char **argv){
     if(!host && argv[i][0] == '-'){
       if(!strcmp(argv[i], "-port")){
         if(++i >= argc) usage();
-        port = atoi(argv[i]);
+        port = tcatoi(argv[i]);
       } else if(!strcmp(argv[i], "-cnum")){
         if(++i >= argc) usage();
-        cnum = atoi(argv[i]);
+        cnum = tcatoi(argv[i]);
       } else if(!strcmp(argv[i], "-shl")){
         if(++i >= argc) usage();
-        shl = atoi(argv[i]);
+        shl = tcatoi(argv[i]);
       } else if(!strcmp(argv[i], "-dai")){
         dai = true;
       } else if(!strcmp(argv[i], "-dad")){
@@ -270,7 +275,7 @@ static int runrcat(int argc, char **argv){
     }
   }
   if(!host || !rstr || cnum < 1) usage();
-  int rnum = atoi(rstr);
+  int rnum = tcatoi(rstr);
   if(rnum < 1) usage();
   int rv = procrcat(host, port, cnum, rnum, shl, dai, dad, ext, xopts);
   return rv;
@@ -287,10 +292,10 @@ static int runmisc(int argc, char **argv){
     if(!host && argv[i][0] == '-'){
       if(!strcmp(argv[i], "-port")){
         if(++i >= argc) usage();
-        port = atoi(argv[i]);
+        port = tcatoi(argv[i]);
       } else if(!strcmp(argv[i], "-cnum")){
         if(++i >= argc) usage();
-        cnum = atoi(argv[i]);
+        cnum = tcatoi(argv[i]);
       } else {
         usage();
       }
@@ -303,7 +308,7 @@ static int runmisc(int argc, char **argv){
     }
   }
   if(!host || !rstr || cnum < 1) usage();
-  int rnum = atoi(rstr);
+  int rnum = tcatoi(rstr);
   if(rnum < 1) usage();
   int rv = procmisc(host, port, cnum, rnum);
   return rv;
@@ -320,10 +325,10 @@ static int runwicked(int argc, char **argv){
     if(!host && argv[i][0] == '-'){
       if(!strcmp(argv[i], "-port")){
         if(++i >= argc) usage();
-        port = atoi(argv[i]);
+        port = tcatoi(argv[i]);
       } else if(!strcmp(argv[i], "-cnum")){
         if(++i >= argc) usage();
-        cnum = atoi(argv[i]);
+        cnum = tcatoi(argv[i]);
       } else {
         usage();
       }
@@ -336,9 +341,42 @@ static int runwicked(int argc, char **argv){
     }
   }
   if(!host || !rstr || cnum < 1) usage();
-  int rnum = atoi(rstr);
+  int rnum = tcatoi(rstr);
   if(rnum < 1) usage();
   int rv = procwicked(host, port, cnum, rnum);
+  return rv;
+}
+
+
+/* parse arguments of table command */
+static int runtable(int argc, char **argv){
+  char *host = NULL;
+  char *rstr = NULL;
+  int port = DEFPORT;
+  int cnum = 1;
+  for(int i = 2; i < argc; i++){
+    if(!host && argv[i][0] == '-'){
+      if(!strcmp(argv[i], "-port")){
+        if(++i >= argc) usage();
+        port = tcatoi(argv[i]);
+      } else if(!strcmp(argv[i], "-cnum")){
+        if(++i >= argc) usage();
+        cnum = tcatoi(argv[i]);
+      } else {
+        usage();
+      }
+    } else if(!host){
+      host = argv[i];
+    } else if(!rstr){
+      rstr = argv[i];
+    } else {
+      usage();
+    }
+  }
+  if(!host || !rstr || cnum < 1) usage();
+  int rnum = tcatoi(rstr);
+  if(rnum < 1) usage();
+  int rv = proctable(host, port, cnum, rnum);
   return rv;
 }
 
@@ -548,7 +586,7 @@ static int procrcat(const char *host, int port, int cnum, int rnum,
     } else if(ext){
       int xsiz;
       char *xbuf = tcrdbext(rdb, ext, xopts, kbuf, ksiz, kbuf, ksiz, &xsiz);
-      if(!xbuf && tcrdbecode(rdb) != TCEMISC){
+      if(!xbuf && tcrdbecode(rdb) != TTEMISC){
         eprint(rdb, "tcrdbext");
         err = true;
         break;
@@ -1131,6 +1169,166 @@ static int procwicked(const char *host, int port, int cnum, int rnum){
   iprintf("record number: %llu\n", (unsigned long long)tcrdbrnum(rdb));
   iprintf("size: %llu\n", (unsigned long long)tcrdbsize(rdb));
   tcmapdel(map);
+  for(int i = 0; i < cnum; i++){
+    if(!tcrdbclose(rdbs[i])){
+      eprint(rdbs[i], "tcrdbclose");
+      err = true;
+    }
+    tcrdbdel(rdbs[i]);
+  }
+  iprintf("time: %.3f\n", tctime() - stime);
+  iprintf("%s\n\n", err ? "error" : "ok");
+  return err ? 1 : 0;
+}
+
+
+/* perform table command */
+static int proctable(const char *host, int port, int cnum, int rnum){
+  iprintf("<Table Extension Test>\n  host=%s  port=%d  cnum=%d  rnum=%d\n\n",
+          host, port, cnum, rnum);
+  bool err = false;
+  double stime = tctime();
+  TCRDB *rdbs[cnum];
+  for(int i = 0; i < cnum; i++){
+    rdbs[i] = tcrdbnew();
+    if(!tcrdbopen(rdbs[i], host, port)){
+      eprint(rdbs[i], "tcrdbopen");
+      err = true;
+    }
+  }
+  TCRDB *rdb = rdbs[0];
+  if(!tcrdbvanish(rdb)){
+    eprint(rdb, "tcrdbvanish");
+    err = true;
+  }
+  if(!tcrdbtblsetindex(rdb, "str", RDBITLEXICAL)){
+    eprint(rdb, "tcrdbtblsetindex");
+    err = true;
+  }
+  if(!tcrdbtblsetindex(rdb, "num", RDBITDECIMAL)){
+    eprint(rdb, "tcrdbtblsetindex");
+    err = true;
+  }
+  iprintf("writing:\n");
+  for(int i = 1; i <= rnum && !err; i++){
+    int id = (int)tcrdbtblgenuid(rdb);
+    char pkbuf[RECBUFSIZ];
+    int pksiz = sprintf(pkbuf, "%d", id);
+    TCMAP *cols = tcmapnew2(7);
+    char vbuf[RECBUFSIZ*5];
+    int vsiz = sprintf(vbuf, "%d", id);
+    tcmapput(cols, "str", 3, vbuf, vsiz);
+    vsiz = sprintf(vbuf, "%d", myrand(i) + 1);
+    tcmapput(cols, "num", 3, vbuf, vsiz);
+    vsiz = sprintf(vbuf, "%d", myrand(32) + 1);
+    tcmapput(cols, "type", 4, vbuf, vsiz);
+    int num = myrand(5);
+    int pt = 0;
+    char *wp = vbuf;
+    for(int j = 0; j < num; j++){
+      pt += myrand(5) + 1;
+      if(wp > vbuf) *(wp++) = ',';
+      wp += sprintf(wp, "%d", pt);
+    }
+    *wp = '\0';
+    if(*vbuf != '\0') tcmapput(cols, "flag", 4, vbuf, wp - vbuf);
+    switch(myrand(4)){
+    default:
+      if(!tcrdbtblput(rdb, pkbuf, pksiz, cols)){
+        eprint(rdb, "tcrdbtblput");
+        err = true;
+      }
+      break;
+    case 1:
+      if(!tcrdbtblputkeep(rdb, pkbuf, pksiz, cols)){
+        eprint(rdb, "tcrdbtblputkeep");
+        err = true;
+      }
+      break;
+    case 2:
+      if(!tcrdbtblputcat(rdb, pkbuf, pksiz, cols)){
+        eprint(rdb, "tcrdbtblput");
+        err = true;
+      }
+      break;
+    }
+    tcmapdel(cols);
+    if(rnum > 250 && i % (rnum / 250) == 0){
+      iputchar('.');
+      if(i == rnum || i % (rnum / 10) == 0) iprintf(" (%08d)\n", i);
+      rdb = rdbs[myrand(rnum)%cnum];
+    }
+  }
+  iprintf("removing:\n");
+  for(int i = 1; i <= rnum && !err; i++){
+    char pkbuf[RECBUFSIZ];
+    int pksiz = sprintf(pkbuf, "%d", myrand(rnum) + 1);
+    if(!tcrdbtblout(rdb, pkbuf, pksiz) && tcrdbecode(rdb) != TTEMISC){
+      eprint(rdb, "tcrdbtblout");
+      err = true;
+    }
+    if(rnum > 250 && i % (rnum / 250) == 0){
+      iputchar('.');
+      if(i == rnum || i % (rnum / 10) == 0) iprintf(" (%08d)\n", i);
+      rdb = rdbs[myrand(rnum)%cnum];
+    }
+  }
+  iprintf("reading:\n");
+  for(int i = 1; i <= rnum && !err; i++){
+    char pkbuf[RECBUFSIZ];
+    int pksiz = sprintf(pkbuf, "%d", myrand(rnum) + 1);
+    TCMAP *cols = tcrdbtblget(rdb, pkbuf, pksiz);
+    if(cols){
+      tcmapdel(cols);
+    } else if(tcrdbecode(rdb) != TTEMISC){
+      eprint(rdb, "tcrdbtblget");
+      err = true;
+    }
+    if(rnum > 250 && i % (rnum / 250) == 0){
+      iputchar('.');
+      if(i == rnum || i % (rnum / 10) == 0) iprintf(" (%08d)\n", i);
+      rdb = rdbs[myrand(rnum)%cnum];
+    }
+  }
+  iprintf("searching:\n");
+  const char *names[] = { "", "str", "num", "type", "flag", "c1" };
+  int ops[] = { RDBQCSTREQ, RDBQCSTRINC, RDBQCSTRBW, RDBQCSTREW, RDBQCSTRAND, RDBQCSTROR,
+                RDBQCSTROREQ, RDBQCSTRRX, RDBQCNUMEQ, RDBQCNUMGT, RDBQCNUMGE, RDBQCNUMLT,
+                RDBQCNUMLE, RDBQCNUMBT, RDBQCNUMOREQ };
+  int types[] = { RDBQOSTRASC, RDBQOSTRDESC, RDBQONUMASC, RDBQONUMDESC };
+  for(int i = 1; i <= rnum && !err; i++){
+    RDBQRY *qry = tcrdbqrynew(rdb);
+    int condnum = myrand(4);
+    if(condnum < 1 && myrand(5) != 0) condnum = 1;
+    for(int j = 0; j < condnum; j++){
+      const char *name = names[myrand(sizeof(names) / sizeof(*names))];
+      int op = ops[myrand(sizeof(ops) / sizeof(*ops))];
+      if(myrand(20) == 0) op |= RDBQCNEGATE;
+      if(myrand(20) == 0) op |= RDBQCNOIDX;
+      char expr[RECBUFSIZ*3];
+      char *wp = expr;
+      wp += sprintf(expr, "%d", myrand(i));
+      if(myrand(10) == 0) wp += sprintf(wp, ",%d", myrand(i));
+      if(myrand(10) == 0) wp += sprintf(wp, ",%d", myrand(i));
+      tcrdbqryaddcond(qry, name, op, expr);
+    }
+    if(myrand(3) != 0){
+      const char *name = names[myrand(sizeof(names) / sizeof(*names))];
+      int type = types[myrand(sizeof(types) / sizeof(*types))];
+      tcrdbqrysetorder(qry, name, type);
+    }
+    if(myrand(3) != 0) tcrdbqrysetmax(qry, myrand(i));
+    TCLIST *res = tcrdbqrysearch(qry);
+    tclistdel(res);
+    tcrdbqrydel(qry);
+    if(rnum > 250 && i % (rnum / 250) == 0){
+      iputchar('.');
+      if(i == rnum || i % (rnum / 10) == 0) iprintf(" (%08d)\n", i);
+      rdb = rdbs[myrand(rnum)%cnum];
+    }
+  }
+  iprintf("record number: %llu\n", (unsigned long long)tcrdbrnum(rdb));
+  iprintf("size: %llu\n", (unsigned long long)tcrdbsize(rdb));
   for(int i = 0; i < cnum; i++){
     if(!tcrdbclose(rdbs[i])){
       eprint(rdbs[i], "tcrdbclose");

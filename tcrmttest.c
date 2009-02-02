@@ -144,10 +144,10 @@ static int runwrite(int argc, char **argv){
     if(!host && argv[i][0] == '-'){
       if(!strcmp(argv[i], "-port")){
         if(++i >= argc) usage();
-        port = atoi(argv[i]);
+        port = tcatoi(argv[i]);
       } else if(!strcmp(argv[i], "-tnum")){
         if(++i >= argc) usage();
-        tnum = atoi(argv[i]);
+        tnum = tcatoi(argv[i]);
       } else if(!strcmp(argv[i], "-nr")){
         nr = true;
       } else if(!strcmp(argv[i], "-ext")){
@@ -167,7 +167,7 @@ static int runwrite(int argc, char **argv){
     }
   }
   if(!host || !rstr || tnum < 1) usage();
-  int rnum = atoi(rstr);
+  int rnum = tcatoi(rstr);
   if(rnum < 1) usage();
   int rv = procwrite(host, port, tnum, rnum, nr, ext, rnd);
   return rv;
@@ -185,13 +185,13 @@ static int runread(int argc, char **argv){
     if(!host && argv[i][0] == '-'){
       if(!strcmp(argv[i], "-port")){
         if(++i >= argc) usage();
-        port = atoi(argv[i]);
+        port = tcatoi(argv[i]);
       } else if(!strcmp(argv[i], "-tnum")){
         if(++i >= argc) usage();
-        tnum = atoi(argv[i]);
+        tnum = tcatoi(argv[i]);
       } else if(!strcmp(argv[i], "-mul")){
         if(++i >= argc) usage();
-        mul = atoi(argv[i]);
+        mul = tcatoi(argv[i]);
       } else if(!strcmp(argv[i], "-rnd")){
         rnd = true;
       } else {
@@ -219,10 +219,10 @@ static int runremove(int argc, char **argv){
     if(!host && argv[i][0] == '-'){
       if(!strcmp(argv[i], "-port")){
         if(++i >= argc) usage();
-        port = atoi(argv[i]);
+        port = tcatoi(argv[i]);
       } else if(!strcmp(argv[i], "-tnum")){
         if(++i >= argc) usage();
-        tnum = atoi(argv[i]);
+        tnum = tcatoi(argv[i]);
       } else if(!strcmp(argv[i], "-rnd")){
         rnd = true;
       } else {

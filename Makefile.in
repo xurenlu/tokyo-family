@@ -303,13 +303,13 @@ tcrmgr : tcrmgr.o $(LIBRARYFILES)
 
 myconf.o scrext.o : myconf.h
 
-ttutil.o : ttutil.h myconf.h
+ttutil.o : myconf.h ttutil.h
 
-tculog.o : tculog.h ttutil.h myconf.h
+tculog.o : myconf.h ttutil.h tculog.h
 
-tcrdb.o : tcrdb.h ttutil.h myconf.h
+tcrdb.o : myconf.h ttutil.h tcrdb.h
 
-ttserver.o ttulmgr.o ttultest.o tcrtest.o tcrmgr.o : ttutil.h tculog.h tcrdb.h myconf.h
+ttserver.o ttulmgr.o ttultest.o tcrtest.o tcrmgr.o : myconf.h ttutil.h tculog.h tcrdb.h
 
 ttserver.o : scrext.h
 

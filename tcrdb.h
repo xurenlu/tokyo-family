@@ -28,6 +28,7 @@ __TCRDB_CLINKAGEBEGIN
 
 
 #include <tcutil.h>
+#include <tcadb.h>
 #include <ttutil.h>
 #include <stdlib.h>
 #include <stdbool.h>
@@ -460,17 +461,191 @@ char *tcrdbstat(TCRDB *rdb);
 
 /* Call a versatile function for miscellaneous operations of a remote database object.
    `rdb' specifies the remote database object.
-   `name' specifies the name of the function.
+   `name' specifies the name of the function.  All databases support "putlist", "outlist", and
+   "getlist".  "putlist" is to store records.  It receives keys and values one after the other,
+   and returns an empty list.  "outlist" is to remove records.  It receives keys, and returns an
+   empty list.  "getlist" is to retrieve records.  It receives keys, and returns keys and values
+   of corresponding records one after the other.  Table database supports "setindex", "search",
+   and "genuid".
    `opts' specifies options by bitwise or: `RDBMONOULOG' for omission of the update log.
    `args' specifies a list object containing arguments.
    If successful, the return value is a list object of the result.  `NULL' is returned on failure.
-   All databases support "putlist", "outlist", and "getlist".  "putlist" is to store records.  It
-   receives keys and values one after the other, and returns an empty list.  "outlist" is to
-   remove records.  It receives keys, and returns an empty list.  "getlist" is to retrieve
-   records.  It receives keys, and returns keys and values of corresponding records one after the
-   other.  Because the object of the return value is created with the function `tclistnew', it
+   Because the object of the return value is created with the function `tclistnew', it
    should be deleted with the function `tclistdel' when it is no longer in use. */
 TCLIST *tcrdbmisc(TCRDB *rdb, const char *name, int opts, const TCLIST *args);
+
+
+
+/*************************************************************************************************
+ * table extension
+ *************************************************************************************************/
+
+
+enum {                                   /* enumeration for index types */
+  RDBITLEXICAL = TDBITLEXICAL,           /* lexical string */
+  RDBITDECIMAL = TDBITDECIMAL,           /* decimal string */
+  RDBITVOID = TDBITVOID,                 /* void */
+  RDBITKEEP = TDBITKEEP                  /* keep existing index */
+};
+
+typedef struct {                         /* type of structure for a query */
+  TCRDB *rdb;                            /* database object */
+  TCLIST *args;                          /* arguments for the method */
+} RDBQRY;
+
+enum {                                   /* enumeration for query conditions */
+  RDBQCSTREQ = TDBQCSTREQ,               /* string is equal to */
+  RDBQCSTRINC = TDBQCSTRINC,             /* string is included in */
+  RDBQCSTRBW = TDBQCSTRBW,               /* string begins with */
+  RDBQCSTREW = TDBQCSTREW,               /* string ends with */
+  RDBQCSTRAND = TDBQCSTRAND,             /* string includes all tokens in */
+  RDBQCSTROR = TDBQCSTROR,               /* string includes at least one token in */
+  RDBQCSTROREQ = TDBQCSTROREQ,           /* string is equal to at least one token in */
+  RDBQCSTRRX = TDBQCSTRRX,               /* string matches regular expressions of */
+  RDBQCNUMEQ = TDBQCNUMEQ,               /* number is equal to */
+  RDBQCNUMGT = TDBQCNUMGT,               /* number is greater than */
+  RDBQCNUMGE = TDBQCNUMGE,               /* number is greater than or equal to */
+  RDBQCNUMLT = TDBQCNUMLT,               /* number is less than */
+  RDBQCNUMLE = TDBQCNUMLE,               /* number is less than or equal to */
+  RDBQCNUMBT = TDBQCNUMBT,               /* number is between two tokens of */
+  RDBQCNUMOREQ = TDBQCNUMOREQ,           /* number is equal to at least one token in */
+  RDBQCNEGATE = TDBQCNEGATE,             /* negation flag */
+  RDBQCNOIDX = TDBQCNOIDX                /* no index flag */
+};
+
+enum {                                   /* enumeration for order types */
+  RDBQOSTRASC = TDBQOSTRASC,             /* string ascending */
+  RDBQOSTRDESC = TDBQOSTRDESC,           /* string descending */
+  RDBQONUMASC = TDBQONUMASC,             /* number ascending */
+  RDBQONUMDESC = TDBQONUMDESC            /* number descending */
+};
+
+
+/* Store a record into a remote database object.
+   `rdb' specifies the remote database object connected as a writer.
+   `pkbuf' specifies the pointer to the region of the primary key.
+   `pksiz' specifies the size of the region of the primary key.
+   `cols' specifies a map object containing columns.
+   If successful, the return value is true, else, it is false.
+   If a record with the same key exists in the database, it is overwritten. */
+bool tcrdbtblput(TCRDB *rdb, const void *pkbuf, int pksiz, TCMAP *cols);
+
+
+/* Store a new record into a remote database object.
+   `rdb' specifies the remote database object connected as a writer.
+   `pkbuf' specifies the pointer to the region of the primary key.
+   `pksiz' specifies the size of the region of the primary key.
+   `cols' specifies a map object containing columns.
+   If successful, the return value is true, else, it is false.
+   If a record with the same key exists in the database, this function has no effect. */
+bool tcrdbtblputkeep(TCRDB *rdb, const void *pkbuf, int pksiz, TCMAP *cols);
+
+
+/* Concatenate columns of the existing record in a remote database object.
+   `rdb' specifies the remote database object connected as a writer.
+   `pkbuf' specifies the pointer to the region of the primary key.
+   `pksiz' specifies the size of the region of the primary key.
+   `cols' specifies a map object containing columns.
+   If successful, the return value is true, else, it is false.
+   If there is no corresponding record, a new record is created. */
+bool tcrdbtblputcat(TCRDB *rdb, const void *pkbuf, int pksiz, TCMAP *cols);
+
+
+/* Remove a record of a remote database object.
+   `rdb' specifies the remote database object connected as a writer.
+   `pkbuf' specifies the pointer to the region of the primary key.
+   `pksiz' specifies the size of the region of the primary key.
+   If successful, the return value is true, else, it is false. */
+bool tcrdbtblout(TCRDB *rdb, const void *pkbuf, int pksiz);
+
+
+/* Retrieve a record in a remote database object.
+   `rdb' specifies the remote database object.
+   `pkbuf' specifies the pointer to the region of the primary key.
+   `pksiz' specifies the size of the region of the primary key.
+   If successful, the return value is a map object of the columns of the corresponding record.
+   `NULL' is returned if no record corresponds.
+   Because the object of the return value is created with the function `tcmapnew', it should be
+   deleted with the function `tcmapdel' when it is no longer in use. */
+TCMAP *tcrdbtblget(TCRDB *rdb, const void *pkbuf, int pksiz);
+
+
+/* Set a column index to a remote database object.
+   `rdb' specifies the remote database object connected as a writer.
+   `name' specifies the name of a column.  If the name of an existing index is specified, the
+   index is rebuilt.  An empty string means the primary key.
+   `type' specifies the index type: `RDBITLEXICAL' for lexical string, `RDBITDECIMAL' for decimal
+   string.  If it is `RDBITVOID', the index is removed.  If `RDBITKEEP' is added by bitwise or
+   and the index exists, this function merely returns failure.
+   If successful, the return value is true, else, it is false.
+   Note that the setting indexes should be set after the database is opened. */
+bool tcrdbtblsetindex(TCRDB *rdb, const char *name, int type);
+
+
+/* Generate a unique ID number of a remote database object.
+   `rdb' specifies the remote database object connected as a writer.
+   The return value is the new unique ID number or -1 on failure. */
+int64_t tcrdbtblgenuid(TCRDB *rdb);
+
+
+/* Create a query object.
+   `rdb' specifies the remote database object.
+   The return value is the new query object. */
+RDBQRY *tcrdbqrynew(TCRDB *rdb);
+
+
+/* Delete a query object.
+   `qry' specifies the query object. */
+void tcrdbqrydel(RDBQRY *qry);
+
+
+/* Add a narrowing condition to a query object.
+   `qry' specifies the query object.
+   `name' specifies the name of a column.  An empty string means the primary key.
+   `op' specifies an operation type: `RDBQCSTREQ' for string which is equal to the expression,
+   `RDBQCSTRINC' for string which is included in the expression, `RDBQCSTRBW' for string which
+   begins with the expression, `RDBQCSTREW' for string which ends with the expression,
+   `RDBQCSTRAND' for string which includes all tokens in the expression, `RDBQCSTROR' for string
+   which includes at least one token in the expression, `RDBQCSTROREQ' for string which is equal
+   to at least one token in the expression, `RDBQCSTRRX' for string which matches regular
+   expressions of the expression, `RDBQCNUMEQ' for number which is equal to the expression,
+   `RDBQCNUMGT' for number which is greater than the expression, `RDBQCNUMGE' for number which is
+   greater than or equal to the expression, `RDBQCNUMLT' for number which is less than the
+   expression, `RDBQCNUMLE' for number which is less than or equal to the expression, `RDBQCNUMBT'
+   for number which is between two tokens of the expression, `RDBQCNUMOREQ' for number which is
+   equal to at least one token in the expression.  All operations can be flagged by bitwise or:
+   `RDBQCNEGATE' for negation, `RDBQCNOIDX' for using no index.
+   `expr' specifies an operand exression. */
+void tcrdbqryaddcond(RDBQRY *qry, const char *name, int op, const char *expr);
+
+
+/* Set the order of a query object.
+   `qry' specifies the query object.
+   `name' specifies the name of a column.  An empty string means the primary key.
+   `type' specifies the order type: `RDBQOSTRASC' for string ascending, `RDBQOSTRDESC' for
+   string descending, `RDBQONUMASC' for number ascending, `RDBQONUMDESC' for number descending. */
+void tcrdbqrysetorder(RDBQRY *qry, const char *name, int type);
+
+
+/* Set the maximum number of records of the result of a query object.
+   `qry' specifies the query object.
+   `max' specifies the maximum number of records of the result. */
+void tcrdbqrysetmax(RDBQRY *qry, int max);
+
+
+/* Execute the search of a query object.
+   `qry' specifies the query object.
+   The return value is a list object of the primary keys of the corresponding records.  This
+   function does never fail and return an empty list even if no record corresponds.
+   Because the object of the return value is created with the function `tclistnew', it should
+   be deleted with the function `tclistdel' when it is no longer in use. */
+TCLIST *tcrdbqrysearch(RDBQRY *qry);
+
+
+/* Remove each record corresponding to a query object.
+   `qry' specifies the query object of the database connected as a writer.
+   If successful, the return value is true, else, it is false. */
+bool tcrdbqrysearchout(RDBQRY *qry);
 
 
 

@@ -298,7 +298,7 @@ bool tculogadbrestore(TCADB *adb, const char *path, uint64_t ts, bool con, TCULO
 bool tculogadbredo(TCADB *adb, const char *ptr, int size, bool con, TCULOG *ulog, uint32_t sid);
 
 
-/* Create a replicatoin object.
+/* Create a replication object.
    The return value is the new replicatoin object. */
 TCREPL *tcreplnew(void);
 

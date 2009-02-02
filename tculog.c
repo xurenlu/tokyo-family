@@ -97,7 +97,7 @@ bool tculogopen(TCULOG *ulog, const char *base, uint64_t limsiz){
   for(int i = 0; i < ln; i++){
     const char *name = tclistval2(names, i);
     if(!tcstrbwm(name, TCULSUFFIX)) continue;
-    int id = atoi(name);
+    int id = tcatoi(name);
     char *path = tcsprintf("%s/%08d%s", base, id, TCULSUFFIX);
     if(stat(path, &sbuf) == 0 && S_ISREG(sbuf.st_mode) && id > max) max = id;
     tcfree(path);
@@ -306,7 +306,7 @@ TCULRD *tculrdnew(TCULOG *ulog, uint64_t ts){
   for(int i = 0; i < ln; i++){
     const char *name = tclistval2(names, i);
     if(!tcstrbwm(name, TCULSUFFIX)) continue;
-    int id = atoi(name);
+    int id = tcatoi(name);
     char *path = tcsprintf("%s/%08d%s", ulog->base, id, TCULSUFFIX);
     struct stat sbuf;
     if(stat(path, &sbuf) == 0 && S_ISREG(sbuf.st_mode) && id > max) max = id;
@@ -899,7 +899,7 @@ bool tculogadbredo(TCADB *adb, const char *ptr, int size, bool con, TCULOG *ulog
 }
 
 
-/* Create a replicatoin object. */
+/* Create a replication object. */
 TCREPL *tcreplnew(void){
   TCREPL *repl = tcmalloc(sizeof(*repl));
   repl->fd = -1;
