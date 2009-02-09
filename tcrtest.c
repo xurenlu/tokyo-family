@@ -1327,6 +1327,35 @@ static int proctable(const char *host, int port, int cnum, int rnum){
       rdb = rdbs[myrand(rnum)%cnum];
     }
   }
+  RDBQRY *qry = tcrdbqrynew(rdb);
+  tcrdbqryaddcond(qry, "", RDBQCSTRBW, "1");
+  tcrdbqrysetorder(qry, "str", RDBQOSTRASC);
+  tcrdbqrysetmax(qry, 10);
+  TCLIST *res = tcrdbqrysearchget(qry);
+  for(int i = 0; i < tclistnum(res); i++){
+    TCMAP *cols = tcrdbqryrescols(res, i);
+    if(!tcmapget2(cols, "")){
+      eprint(rdbs[i], "(validation)");
+      err = true;
+      break;
+    }
+    tcmapdel(cols);
+  }
+  tclistdel(res);
+  tcrdbqrydel(qry);
+  qry = tcrdbqrynew(rdb);
+  res = tcrdbqrysearch(qry);
+  if(tclistnum(res) != tcrdbrnum(rdb)){
+    eprint(rdb, "(validation)");
+    err = true;
+  }
+  tclistdel(res);
+  tcrdbqrysearchout(qry);
+  if(tcrdbrnum(rdb) != 0){
+    eprint(rdb, "(validation)");
+    err = true;
+  }
+  tcrdbqrydel(qry);
   iprintf("record number: %llu\n", (unsigned long long)tcrdbrnum(rdb));
   iprintf("size: %llu\n", (unsigned long long)tcrdbsize(rdb));
   for(int i = 0; i < cnum; i++){

@@ -7,7 +7,7 @@
 #================================================================
 
 # Package name
-AC_INIT(tokyotyrant, 1.1.12)
+AC_INIT(tokyotyrant, 1.1.13)
 
 # Package information
 MYLIBVER=2

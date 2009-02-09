@@ -1416,11 +1416,32 @@ bool tcrdbqrysearchout(RDBQRY *qry){
   assert(qry);
   TCLIST *args = tclistdup(qry->args);
   tclistpush2(args, "out");
-  TCLIST *rv = tcrdbmisc(qry->rdb, "searchout", 0, args);
+  TCLIST *rv = tcrdbmisc(qry->rdb, "search", 0, args);
   tclistdel(args);
   if(!rv) return false;
   tclistdel(rv);
   return true;
+}
+
+
+/* Get records corresponding to the search of a query object. */
+TCLIST *tcrdbqrysearchget(RDBQRY *qry){
+  assert(qry);
+  TCLIST *args = tclistdup(qry->args);
+  tclistpush2(args, "columns");
+  TCLIST *rv = tcrdbmisc(qry->rdb, "search", 0, args);
+  tclistdel(args);
+  return rv;
+}
+
+
+/* Get columns of a record in a search result. */
+TCMAP *tcrdbqryrescols(TCLIST *res, int index){
+  assert(res && index >= 0);
+  if(index >= tclistnum(res)) return NULL;
+  int csiz;
+  const char *cbuf = tclistval(res, index, &csiz);
+  return tcstrsplit4(cbuf, csiz);
 }
 
 

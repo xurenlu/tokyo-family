@@ -919,6 +919,162 @@ var {
 <dd>Because the object of the return value is created with the function `tclistnew', it should be deleted with the function `tclistdel' when it is no longer in use.</dd>
 </dl>
 
+<h3>API of the Table Extension</h3>
+
+<p>The function `tcrdbtblput' is used in order to store a record into a remote database object.</p>
+
+<dl class="api">
+<dt><code>bool tcrdbtblput(TCRDB *<var>rdb</var>, const void *<var>pkbuf</var>, int <var>pksiz</var>, TCMAP *<var>cols</var>);</code></dt>
+<dd>`<var>rdb</var>' specifies the remote database object connected as a writer.</dd>
+<dd>`<var>pkbuf</var>' specifies the pointer to the region of the primary key.</dd>
+<dd>`<var>pksiz</var>' specifies the size of the region of the primary key.</dd>
+<dd>`<var>cols</var>' specifies a map object containing columns.</dd>
+<dd>If successful, the return value is true, else, it is false.</dd>
+<dd>If a record with the same key exists in the database, it is overwritten.</dd>
+</dl>
+
+<p>The function `tcrdbtblputkeep' is used in order to store a new record into a remote database object.</p>
+
+<dl class="api">
+<dt><code>bool tcrdbtblputkeep(TCRDB *<var>rdb</var>, const void *<var>pkbuf</var>, int <var>pksiz</var>, TCMAP *<var>cols</var>);</code></dt>
+<dd>`<var>rdb</var>' specifies the remote database object connected as a writer.</dd>
+<dd>`<var>pkbuf</var>' specifies the pointer to the region of the primary key.</dd>
+<dd>`<var>pksiz</var>' specifies the size of the region of the primary key.</dd>
+<dd>`<var>cols</var>' specifies a map object containing columns.</dd>
+<dd>If successful, the return value is true, else, it is false.</dd>
+<dd>If a record with the same key exists in the database, this function has no effect.</dd>
+</dl>
+
+<p>The function `tcrdbtblputcat' is used in order to concatenate columns of the existing record in a remote database object.</p>
+
+<dl class="api">
+<dt><code>bool tcrdbtblputcat(TCRDB *<var>rdb</var>, const void *<var>pkbuf</var>, int <var>pksiz</var>, TCMAP *<var>cols</var>);</code></dt>
+<dd>`<var>rdb</var>' specifies the remote database object connected as a writer.</dd>
+<dd>`<var>pkbuf</var>' specifies the pointer to the region of the primary key.</dd>
+<dd>`<var>pksiz</var>' specifies the size of the region of the primary key.</dd>
+<dd>`<var>cols</var>' specifies a map object containing columns.</dd>
+<dd>If successful, the return value is true, else, it is false.</dd>
+<dd>If there is no corresponding record, a new record is created.</dd>
+</dl>
+
+<p>The function `tcrdbtblout' is used in order to remove a record of a remote database object.</p>
+
+<dl class="api">
+<dt><code>bool tcrdbtblout(TCRDB *<var>rdb</var>, const void *<var>pkbuf</var>, int <var>pksiz</var>);</code></dt>
+<dd>`<var>rdb</var>' specifies the remote database object connected as a writer.</dd>
+<dd>`<var>pkbuf</var>' specifies the pointer to the region of the primary key.</dd>
+<dd>`<var>pksiz</var>' specifies the size of the region of the primary key.</dd>
+<dd>If successful, the return value is true, else, it is false.</dd>
+</dl>
+
+<p>The function `tcrdbtblget' is used in order to retrieve a record in a remote database object.</p>
+
+<dl class="api">
+<dt><code>TCMAP *tcrdbtblget(TCRDB *<var>rdb</var>, const void *<var>pkbuf</var>, int <var>pksiz</var>);</code></dt>
+<dd>`<var>rdb</var>' specifies the remote database object.</dd>
+<dd>`<var>pkbuf</var>' specifies the pointer to the region of the primary key.</dd>
+<dd>`<var>pksiz</var>' specifies the size of the region of the primary key.</dd>
+<dd>If successful, the return value is a map object of the columns of the corresponding record.  `NULL' is returned if no record corresponds.</dd>
+<dd>Because the object of the return value is created with the function `tcmapnew', it should be deleted with the function `tcmapdel' when it is no longer in use.</dd>
+</dl>
+
+<p>The function `tcrdbtblsetindex' is used in order to set a column index to a remote database object.</p>
+
+<dl class="api">
+<dt><code>bool tcrdbtblsetindex(TCRDB *<var>rdb</var>, const char *<var>name</var>, int <var>type</var>);</code></dt>
+<dd>`<var>rdb</var>' specifies the remote database object connected as a writer.</dd>
+<dd>`<var>name</var>' specifies the name of a column.  If the name of an existing index is specified, the index is rebuilt.  An empty string means the primary key.</dd>
+<dd>`<var>type</var>' specifies the index type: `RDBITLEXICAL' for lexical string, `RDBITDECIMAL' for decimal string.  If it is `RDBITVOID', the index is removed.  If `RDBITKEEP' is added by bitwise or and the index exists, this function merely returns failure.</dd>
+<dd>If successful, the return value is true, else, it is false.</dd>
+<dd>Note that the setting indexes should be set after the database is opened.</dd>
+</dl>
+
+<p>The function `tcrdbtblgenuid' is used in order to generate a unique ID number of a remote database object.</p>
+
+<dl class="api">
+<dt><code>int64_t tcrdbtblgenuid(TCRDB *<var>rdb</var>);</code></dt>
+<dd>`<var>rdb</var>' specifies the remote database object connected as a writer.</dd>
+<dd>The return value is the new unique ID number or -1 on failure.</dd>
+</dl>
+
+<p>The function `tcrdbqrynew' is used in order to create a query object.</p>
+
+<dl class="api">
+<dt><code>RDBQRY *tcrdbqrynew(TCRDB *<var>rdb</var>);</code></dt>
+<dd>`<var>rdb</var>' specifies the remote database object.</dd>
+<dd>The return value is the new query object.</dd>
+</dl>
+
+<p>The function `tcrdbqrydel' is used in order to delete a query object.</p>
+
+<dl class="api">
+<dt><code>void tcrdbqrydel(RDBQRY *<var>qry</var>);</code></dt>
+<dd>`<var>qry</var>' specifies the query object.</dd>
+</dl>
+
+<p>The function `tcrdbqryaddcond' is used in order to add a narrowing condition to a query object.</p>
+
+<dl class="api">
+<dt><code>void tcrdbqryaddcond(RDBQRY *<var>qry</var>, const char *<var>name</var>, int <var>op</var>, const char *<var>expr</var>);</code></dt>
+<dd>`<var>qry</var>' specifies the query object.</dd>
+<dd>`<var>name</var>' specifies the name of a column.  An empty string means the primary key.</dd>
+<dd>`<var>op</var>' specifies an operation type: `RDBQCSTREQ' for string which is equal to the expression, `RDBQCSTRINC' for string which is included in the expression, `RDBQCSTRBW' for string which begins with the expression, `RDBQCSTREW' for string which ends with the expression, `RDBQCSTRAND' for string which includes all tokens in the expression, `RDBQCSTROR' for string which includes at least one token in the expression, `RDBQCSTROREQ' for string which is equal to at least one token in the expression, `RDBQCSTRRX' for string which matches regular expressions of the expression, `RDBQCNUMEQ' for number which is equal to the expression, `RDBQCNUMGT' for number which is greater than the expression, `RDBQCNUMGE' for number which is greater than or equal to the expression, `RDBQCNUMLT' for number which is less than the expression, `RDBQCNUMLE' for number which is less than or equal to the expression, `RDBQCNUMBT' for number which is between two tokens of the expression, `RDBQCNUMOREQ' for number which is equal to at least one token in the expression.  All operations can be flagged by bitwise or: `RDBQCNEGATE' for negation, `RDBQCNOIDX' for using no index.</dd>
+<dd>`<var>expr</var>' specifies an operand exression.</dd>
+</dl>
+
+<p>The function `tcrdbqrysetorder' is used in order to set the order of a query object.</p>
+
+<dl class="api">
+<dt><code>void tcrdbqrysetorder(RDBQRY *<var>qry</var>, const char *<var>name</var>, int <var>type</var>);</code></dt>
+<dd>`<var>qry</var>' specifies the query object.</dd>
+<dd>`<var>name</var>' specifies the name of a column.  An empty string means the primary key.</dd>
+<dd>`<var>type</var>' specifies the order type: `RDBQOSTRASC' for string ascending, `RDBQOSTRDESC' for string descending, `RDBQONUMASC' for number ascending, `RDBQONUMDESC' for number descending.</dd>
+</dl>
+
+<p>The function `tcrdbqrysetmax' is used in order to set the maximum number of records of the result of a query object.</p>
+
+<dl class="api">
+<dt><code>void tcrdbqrysetmax(RDBQRY *<var>qry</var>, int <var>max</var>);</code></dt>
+<dd>`<var>qry</var>' specifies the query object.</dd>
+<dd>`<var>max</var>' specifies the maximum number of records of the result.</dd>
+</dl>
+
+<p>The function `tcrdbqrysearch' is used in order to execute the search of a query object.</p>
+
+<dl class="api">
+<dt><code>TCLIST *tcrdbqrysearch(RDBQRY *<var>qry</var>);</code></dt>
+<dd>`<var>qry</var>' specifies the query object.</dd>
+<dd>The return value is a list object of the primary keys of the corresponding records.  This function does never fail and return an empty list even if no record corresponds.</dd>
+<dd>Because the object of the return value is created with the function `tclistnew', it should be deleted with the function `tclistdel' when it is no longer in use.</dd>
+</dl>
+
+<p>The function `tcrdbqrysearchout' is used in order to remove each record corresponding to a query object.</p>
+
+<dl class="api">
+<dt><code>bool tcrdbqrysearchout(RDBQRY *<var>qry</var>);</code></dt>
+<dd>`<var>qry</var>' specifies the query object of the database connected as a writer.</dd>
+<dd>If successful, the return value is true, else, it is false.</dd>
+</dl>
+
+<p>The function `tcrdbqrysearchget' is used in order to get records corresponding to the search of a query object.</p>
+
+<dl class="api">
+<dt><code>TCLIST *tcrdbqrysearchget(RDBQRY *<var>qry</var>);</code></dt>
+<dd>`<var>qry</var>' specifies the query object.</dd>
+<dd>The return value is a list object of zero separated columns of the corresponding records.</dd>
+<dd>This function does never fail and return an empty list even if no record corresponds.  Because the object of the return value is created with the function `tclistnew', it should be deleted with the function `tclistdel' when it is no longer in use.</dd>
+</dl>
+
+<p>The function `tcrdbqryrescols' is used in order to get columns of a record in a search result.</p>
+
+<dl class="api">
+<dt><code>TCMAP *tcrdbqryrescols(TCLIST *<var>res</var>, int <var>index</var>);</code></dt>
+<dd>`<var>res</var>' specifies a list of zero separated columns of the search result.</dd>
+<dd>`<var>index</var>' the index of a element of the search result.</dd>
+<dd>The return value is a map object containing columns.</dd>
+<dd>Because the object of the return value is created with the function `tcmapnew', it should be deleted with the function `tcmapdel' when it is no longer in use.</dd>
+</dl>
+
 <h3>Example Code</h3>
 
 <p>The following code is an example to use a remote database.</p>

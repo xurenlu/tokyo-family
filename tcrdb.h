@@ -648,6 +648,24 @@ TCLIST *tcrdbqrysearch(RDBQRY *qry);
 bool tcrdbqrysearchout(RDBQRY *qry);
 
 
+/* Get records corresponding to the search of a query object.
+   `qry' specifies the query object.
+   The return value is a list object of zero separated columns of the corresponding records.
+   This function does never fail and return an empty list even if no record corresponds.
+   Because the object of the return value is created with the function `tclistnew', it should
+   be deleted with the function `tclistdel' when it is no longer in use. */
+TCLIST *tcrdbqrysearchget(RDBQRY *qry);
+
+
+/* Get columns of a record in a search result.
+   `res' specifies a list of zero separated columns of the search result.
+   `index' the index of a element of the search result.
+   The return value is a map object containing columns.
+   Because the object of the return value is created with the function `tcmapnew', it should be
+   deleted with the function `tcmapdel' when it is no longer in use. */
+TCMAP *tcrdbqryrescols(TCLIST *res, int index);
+
+
 
 __TCRDB_CLINKAGEEND
 #endif                                   /* duplication check */
