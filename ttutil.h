@@ -274,10 +274,15 @@ double ttunpackdouble(const char *buf);
 #define TTCMDMISC      0x90              /* ID of misc command */
 #define TTCMDREPL      0xa0              /* ID of repl command */
 
+#define TTTIMERMAX     8                 /* maximum number of timers */
+
 typedef struct _TTTIMER {                /* type of structure for a timer */
   pthread_t thid;                        /* thread ID */
   bool alive;                            /* alive flag */
   struct _TTSERV *serv;                  /* server object */
+  double freq_timed;                     /* frequency of timed handler */
+  void (*do_timed)(void *);              /* call back function for timed handler */
+  void *opq_timed;                       /* opaque pointer for timed handler */
 } TTTIMER;
 
 typedef struct _TTREQ {                  /* type of structure for a server */
@@ -297,14 +302,15 @@ typedef struct _TTSERV {                 /* type of structure for a server */
   TCLIST *queue;                         /* queue of requests */
   pthread_mutex_t qmtx;                  /* mutex for the queue */
   pthread_cond_t qcnd;                   /* condition variable for the queue */
+  pthread_mutex_t tmtx;                  /* mutex for the timer */
+  pthread_cond_t tcnd;                   /* condition variable for the timer */
   int thnum;                             /* number of threads */
   double timeout;                        /* timeout milliseconds of each task */
   bool term;                             /* terminate flag */
   void (*do_log)(int, const char *, void *);  /* call back function for logging */
   void *opq_log;                         /* opaque pointer for logging */
-  double freq_timed;                     /* frequency of timed handler */
-  void (*do_timed)(void *);              /* call back function for timed handler */
-  void *opq_timed;                       /* opaque pointer for timed handler */
+  TTTIMER timers[TTTIMERMAX];            /* timer objects */
+  int timernum;                          /* number of timer objects */
   void (*do_task)(TTSOCK *, void *, TTREQ *req);  /* call back function for task */
   void *opq_task;                        /* opaque pointer for task */
 } TTSERV;
@@ -354,13 +360,13 @@ void ttservtune(TTSERV *serv, int thnum, double timeout);
 void ttservsetloghandler(TTSERV *serv, void (*do_log)(int, const char *, void *), void *opq);
 
 
-/* Set the timed handler of a server object.
+/* Add a timed handler to a server object.
    `serv' specifies the server object.
    `freq' specifies the frequency of execution in seconds.
    `do_timed' specifies the pointer to a function to do with a event.  Its parameter is the
    opaque pointer.
    `opq' specifies the opaque pointer to be passed to the handler.  It can be `NULL'. */
-void ttservsettimedhandler(TTSERV *serv, double freq, void (*do_timed)(void *), void *opq);
+void ttservaddtimedhandler(TTSERV *serv, double freq, void (*do_timed)(void *), void *opq);
 
 
 /* Set the response handler of a server object.
@@ -404,8 +410,8 @@ bool ttserviskilled(TTSERV *serv);
  *************************************************************************************************/
 
 
-#define _TT_VERSION    "1.1.13"
-#define _TT_LIBVER     204
+#define _TT_VERSION    "1.1.14"
+#define _TT_LIBVER     205
 #define _TT_PROTVER    "0.9"
 
 

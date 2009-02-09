@@ -387,6 +387,11 @@ bool ttsockprintf(TTSOCK *sock, const char *format, ...){
 /* Receive data by a socket. */
 bool ttsockrecv(TTSOCK *sock, char *buf, int size){
   assert(sock && buf && size >= 0);
+  if(sock->rp + size <= sock->ep){
+    memcpy(buf, sock->rp, size);
+    sock->rp += size;
+    return true;
+  }
   bool err = false;
   char *wp = buf;
   while(size > 0){
@@ -460,26 +465,18 @@ bool ttsockgets(TTSOCK *sock, char *buf, int size){
 /* Receive an 32-bit integer by a socket. */
 uint32_t ttsockgetint32(TTSOCK *sock){
   assert(sock);
-  uint32_t num = ttsockgetc(sock) << 24;
-  num |= ttsockgetc(sock) << 16;
-  num |= ttsockgetc(sock) << 8;
-  num |= ttsockgetc(sock);
-  return num;
+  uint32_t num;
+  ttsockrecv(sock, (char *)&num, sizeof(num));
+  return TTNTOHL(num);
 }
 
 
 /* Receive an 64-bit integer by a socket. */
 uint64_t ttsockgetint64(TTSOCK *sock){
   assert(sock);
-  uint64_t num = (uint64_t)ttsockgetc(sock) << 56;
-  num |= (uint64_t)ttsockgetc(sock) << 48;
-  num |= (uint64_t)ttsockgetc(sock) << 40;
-  num |= (uint64_t)ttsockgetc(sock) << 32;
-  num |= (uint64_t)ttsockgetc(sock) << 24;
-  num |= (uint64_t)ttsockgetc(sock) << 16;
-  num |= (uint64_t)ttsockgetc(sock) << 8;
-  num |= (uint64_t)ttsockgetc(sock);
-  return num;
+  uint64_t num;
+  ttsockrecv(sock, (char *)&num, sizeof(num));
+  return TTNTOHLL(num);
 }
 
 
@@ -743,14 +740,14 @@ TTSERV *ttservnew(void){
   serv->queue = tclistnew();
   if(pthread_mutex_init(&serv->qmtx, NULL) != 0) tcmyfatal("pthread_mutex_init failed");
   if(pthread_cond_init(&serv->qcnd, NULL) != 0) tcmyfatal("pthread_cond_init failed");
+  if(pthread_mutex_init(&serv->tmtx, NULL) != 0) tcmyfatal("pthread_mutex_init failed");
+  if(pthread_cond_init(&serv->tcnd, NULL) != 0) tcmyfatal("pthread_cond_init failed");
   serv->thnum = TTDEFTHNUM;
   serv->timeout = 0;
   serv->term = false;
   serv->do_log = NULL;
   serv->opq_log = NULL;
-  serv->freq_timed = 0.0;
-  serv->do_timed = NULL;
-  serv->opq_timed = NULL;
+  serv->timernum = 0;
   serv->do_task = NULL;
   serv->opq_task = NULL;
   return serv;
@@ -760,8 +757,10 @@ TTSERV *ttservnew(void){
 /* Delete a server object. */
 void ttservdel(TTSERV *serv){
   assert(serv);
-  pthread_mutex_destroy(&serv->qmtx);
+  pthread_cond_destroy(&serv->tcnd);
+  pthread_mutex_destroy(&serv->tmtx);
   pthread_cond_destroy(&serv->qcnd);
+  pthread_mutex_destroy(&serv->qmtx);
   tclistdel(serv->queue);
   tcfree(serv);
 }
@@ -806,12 +805,15 @@ void ttservsetloghandler(TTSERV *serv, void (*do_log)(int, const char *, void *)
 }
 
 
-/* Set the timed handler of a server object. */
-void ttservsettimedhandler(TTSERV *serv, double freq, void (*do_timed)(void *), void *opq){
+/* Add a timed handler to a server object. */
+void ttservaddtimedhandler(TTSERV *serv, double freq, void (*do_timed)(void *), void *opq){
   assert(serv && freq >= 0.0 && do_timed);
-  serv->freq_timed = freq;
-  serv->do_timed = do_timed;
-  serv->opq_timed = opq;
+  if(serv->timernum >= TTTIMERMAX - 1) return;
+  TTTIMER *timer = serv->timers + serv->timernum;
+  timer->freq_timed = freq;
+  timer->do_timed = do_timed;
+  timer->opq_timed = opq;
+  serv->timernum++;
 }
 
 
@@ -848,13 +850,13 @@ bool ttservstart(TTSERV *serv){
   }
   ttservlog(serv, TTLOGSYSTEM, "service started: %d", getpid());
   bool err = false;
-  TTTIMER timer;
-  timer.alive = false;
-  timer.serv = serv;
-  if(serv->do_timed){
-    if(pthread_create(&timer.thid, NULL, ttservtimer, &timer) == 0){
-      ttservlog(serv, TTLOGINFO, "timer thread started");
-      timer.alive = true;
+  for(int i = 0; i < serv->timernum; i++){
+    TTTIMER *timer = serv->timers + i;
+    timer->alive = false;
+    timer->serv = serv;
+    if(pthread_create(&(timer->thid), NULL, ttservtimer, timer) == 0){
+      ttservlog(serv, TTLOGINFO, "timer thread %d started", i + 1);
+      timer->alive = true;
     } else {
       ttservlog(serv, TTLOGERROR, "pthread_create (ttservtimer) failed");
       err = true;
@@ -975,6 +977,10 @@ bool ttservstart(TTSERV *serv){
     err = true;
     ttservlog(serv, TTLOGERROR, "pthread_cond_broadcast failed");
   }
+  if(pthread_cond_broadcast(&serv->tcnd) != 0){
+    err = true;
+    ttservlog(serv, TTLOGERROR, "pthread_cond_broadcast failed");
+  }
   usleep(TTWAITWORKER * 1000);
   for(int i = 0; i < thnum; i++){
     if(!reqs[i].alive) continue;
@@ -992,12 +998,14 @@ bool ttservstart(TTSERV *serv){
   if(tclistnum(serv->queue) > 0)
     ttservlog(serv, TTLOGINFO, "%d requests discarded", tclistnum(serv->queue));
   tclistclear(serv->queue);
-  if(timer.alive){
+  for(int i = 0; i < serv->timernum; i++){
+    TTTIMER *timer = serv->timers + i;
+    if(!timer->alive) continue;
     void *rv;
-    if(pthread_cancel(timer.thid) == 0)
-      ttservlog(serv, TTLOGINFO, "timer thread was canceled");
-    if(pthread_join(timer.thid, &rv) == 0){
-      ttservlog(serv, TTLOGINFO, "timer thread finished");
+    if(pthread_cancel(timer->thid) == 0)
+      ttservlog(serv, TTLOGINFO, "timer thread %d was canceled", i + 1);
+    if(pthread_join(timer->thid, &rv) == 0){
+      ttservlog(serv, TTLOGINFO, "timer thread %d finished", i + 1);
       if(rv && rv != PTHREAD_CANCELED) err = true;
     } else {
       err = true;
@@ -1062,9 +1070,40 @@ static void *ttservtimer(void *argp){
     ttservlog(serv, TTLOGERROR, "pthread_setcancelstate failed");
   }
   usleep(100000);
+  double freqi;
+  double freqd = modf(timer->freq_timed, &freqi);
   while(!serv->term){
-    serv->do_timed(serv->opq_timed);
-    usleep(serv->freq_timed * 1000000);
+    if(pthread_mutex_lock(&serv->tmtx) == 0){
+      struct timeval tv;
+      struct timespec ts;
+      if(gettimeofday(&tv, NULL) == 0){
+        ts.tv_sec = tv.tv_sec + (int)freqi;
+        ts.tv_nsec = tv.tv_usec * 1000 + freqd * 1000000000;
+        if(ts.tv_nsec >= 1000000000){
+          ts.tv_nsec -= 1000000000;
+          ts.tv_sec++;
+        }
+      } else {
+        ts.tv_sec = (1ULL << (sizeof(time_t) * 8 - 1)) - 1;
+        ts.tv_nsec = 0;
+      }
+      int code = pthread_cond_timedwait(&serv->tcnd, &serv->tmtx, &ts);
+      if(code == 0 || code == ETIMEDOUT || code == EINTR){
+        if(pthread_mutex_unlock(&serv->tmtx) != 0){
+          err = true;
+          ttservlog(serv, TTLOGERROR, "pthread_mutex_unlock failed");
+          break;
+        }
+        if(code != 0) timer->do_timed(timer->opq_timed);
+      } else {
+        pthread_mutex_unlock(&serv->tmtx);
+        err = true;
+        ttservlog(serv, TTLOGERROR, "pthread_cond_timedwait failed");
+      }
+    } else {
+      err = true;
+      ttservlog(serv, TTLOGERROR, "pthread_mutex_lock failed");
+    }
   }
   return err ? "error" : NULL;
 }

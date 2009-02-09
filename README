@@ -19,6 +19,7 @@ Contents of the directory tree is below.
   ./             - sources of Tokyo Tyrant
   ./doc/         - manuals and specifications
   ./man/         - manuals for nroff
+  ./ext/         - sample script for the script extension
   ./example/     - sample code of tutorial
   ./lab/         - for test and experiment
 

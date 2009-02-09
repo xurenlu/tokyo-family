@@ -189,9 +189,12 @@ var {
 
 <h2 id="introduction">Introduction</h2>
 
-<p>Tokyo Tyrant is a package of network interface to the DBM called Tokyo Cabinet.  Though the DBM has high performance, you might bother in case that multiple processes share the same database, or remote processes access the database.  Thus, Tokyo Tyrant is provided for concurrent and remote connections to Tokyo Cabinet.  It is composed of the server process managing a database and its access library for client applications.  The server can embed Lua, a lightweight script language so that you can define arbitrary operations of the database.</p>
+<p>Tokyo Tyrant is a package of network interface to the DBM called Tokyo Cabinet.  Though the DBM has high performance, you might bother in case that multiple processes share the same database, or remote processes access the database.  Thus, Tokyo Tyrant is provided for concurrent and remote connections to Tokyo Cabinet.  It is composed of the server process managing a database and its access library for client applications.</p>
 
-<p>The server features high concurrency due to thread-pool modeled implementation and the epoll/kqueue mechanism of the modern Linux/*BSD kernel.  The server and its clients communicate with each other by simple binary protocol on TCP/IP.  Protocols compatible with memcached and HTTP/1.1 are also supported so that almost all principal platforms and programming languages can use Tokyo Tyrant.  High availability and high integrity are also featured due to such mechanisms as hot backup, update logging, and replication.</p>
+<p>The server features high concurrency due to thread-pool modeled implementation and the epoll/kqueue mechanism of the modern Linux/*BSD kernel.  The server and its clients communicate with each other by simple binary protocol on TCP/IP.  Protocols compatible with memcached and HTTP/1.1 are also supported so that almost all principal platforms and programming languages can use Tokyo Tyrant.  High availability and high integrity are also featured due to such mechanisms as hot backup, update logging, and replication.  The server can embed Lua, a lightweight script language so that you can define arbitrary operations of the database.</p>
+
+<p>Because the server uses the abstract API of Tokyo Cabinet, all of the six APIs: the on-memory hash database API, the on-memory tree database API, the hash API, the B+ tree database API, the fixed-length database API, and the table database API, are available from the client with the common interface.  Moreover, the table extension is provided to use specifidc features of the table database.</p>
+
 
 <p><em>As for now, the server works on Linux, FreeBSD, Mac OS X only.</em></p>
 
@@ -254,12 +257,12 @@ var {
 
 <h2 id="serverprog">Server Programs</h2>
 
-<h3>ttserver</h3>
+<h3 id="serverprog_ttserver">ttserver</h3>
 
 <p>The command `<code>ttserver</code>' runs the server managing a database instance.  Because the database is treated by the abstract API of Tokyo Cabinet, you can choose the scheme on start-up of the server.  Supported schema are on-memory hash database, on-memory tree database, hash database, and B+ tree database.  This command is used in the following format.  `<var>dbname</var>' specifies the database name.  If it is omitted, on-memory hash database is specified.</p>
 
 <dl class="api">
-<dt><code>ttserver [-host <var>name</var>] [-port <var>num</var>] [-th<var>num</var> <var>num</var>] [-tout <var>num</var>] [-dmn] [-pid <var>path</var>] [-log <var>path</var>] [-ld|-le] [-ulog <var>path</var>] [-ulim <var>num</var>] [-uas] [-sid <var>num</var>] [-mhost <var>name</var>] [-mport <var>num</var>] [-rts <var>path</var>] [-ext <var>path</var>] [-mask <var>expr</var>] [<var>dbname</var>]</code></dt>
+<dt><code>ttserver [-host <var>name</var>] [-port <var>num</var>] [-th<var>num</var> <var>num</var>] [-tout <var>num</var>] [-dmn] [-pid <var>path</var>] [-log <var>path</var>] [-ld|-le] [-ulog <var>path</var>] [-ulim <var>num</var>] [-uas] [-sid <var>num</var>] [-mhost <var>name</var>] [-mport <var>num</var>] [-rts <var>path</var>] [-ext <var>path</var>] [-extpc <var>name</var> <var>period</var>] [-mask <var>expr</var>] [<var>dbname</var>]</code></dt>
 </dl>
 
 <p>Options feature the following.</p>
@@ -282,6 +285,7 @@ var {
 <li><code>-mport <var>num</var></code> : specify the port number of the replication master server.</li>
 <li><code>-rts <var>path</var></code> : specify the replication time stamp file.</li>
 <li><code>-ext <var>path</var></code> : specify the script language extension file.</li>
+<li><code>-extpc <var>name</var> <var>period</var></code> : specify the function name and the calling period of a periodic command.</li>
 <li><code>-mask <var>expr</var></code> : specify the names of forbidden commands.</li>
 <li><code>-unmask <var>expr</var></code> : specify the names of allowed commands.</li>
 </ul>
@@ -292,7 +296,7 @@ var {
 
 <p>The command mask expression is a list of command names separated by ",".  For example, "out,vanish,copy" means a set of "out", "vanish", and "copy".  Commands of the memcached compatible protocol and the HTTP compatible protocol are also forbidden or allowed, related by the mask of each original command.  Moreover, there are meta expressions.  "all" means all commands.  "allorg" means all commands of the original binary protocol.  "allmc" means all commands of the memcached compatible protocol.  "allhttp" means all commands of the HTTP compatible protocol.  "allread" is the abbreviation of `get', `mget', `vsiz', `iterinit', `iternext', `fwmkeys', `rnum', `size', and `stat'.  "allwrite" is the abbreviation of `put', `putkeep', `putcat', `putshl', `putnr', `out', `addint', `adddouble', `vanish', and `misc'.  "allmanage" is the abbreviation of `sync', `copy', `restore', and `setmst'.  "repl" means replication as master.  "slave" means replication as slave.</p>
 
-<h3>ttservctl</h3>
+<h3 id="serverprog_ttservctl">ttservctl</h3>
 
 <p>The command `<code>ttservctl</code>' is the startup script of the server.  It can be called by the RC script of the bootstrap process of the operating system.  This command is used in the following format.</p>
 
@@ -309,7 +313,7 @@ var {
 
 <p>The database is placed as "/var/ttserver/casket.tch".  The log and related files are also placed in "/var/ttserver".  This command returns 0 on success, another on failure.</p>
 
-<h3>ttulmgr</h3>
+<h3 id="serverprog_ttulmgr">ttulmgr</h3>
 
 <p>The command `<code>ttulmgr</code>' is the utility to export and import the update log.  It is useful to filter the update log with such text utilities as `<code>grep</code>' and `<code>sed</code>'.  This command is used in the following format.  `<var>upath</var>' specifies the update log directory.</p>
 
@@ -333,7 +337,7 @@ var {
 
 <h2 id="clientprog">Client Programs</h2>
 
-<h3>tcrtest</h3>
+<h3 id="clientprog_tcrtest">tcrtest</h3>
 
 <p>The command `<code>tcrtest</code>' is a utility for facility test and performance test.  This command is used in the following format.  `<var>host</var>' specifies the host name of the server.  `<var>rnum</var>' specifies the number of iterations.</p>
 
@@ -372,7 +376,7 @@ var {
 
 <p>If the port number is not more than 0, UNIX domain socket is used and the path of the socket file is specified by the host parameter.  This command returns 0 on success, another on failure.</p>
 
-<h3>tcrmttest</h3>
+<h3 id="clientprog_tcrmttest">tcrmttest</h3>
 
 <p>The command `<code>tcrmttest</code>' is a utility for facility test under multi-thread situation.  This command is used in the following format.  `<var>host</var>' specifies the host name of the server.  `<var>rnum</var>' specifies the number of iterations.</p>
 
@@ -399,7 +403,7 @@ var {
 
 <p>If the port number is not more than 0, UNIX domain socket is used and the path of the socket file is specified by the host parameter.  This command returns 0 on success, another on failure.</p>
 
-<h3>tcrmgr</h3>
+<h3 id="clientprog_tcrmgr">tcrmgr</h3>
 
 <p>The command `<code>tcrmgr</code>' is a utility for test and debugging of the remote database API and its applications.  `<var>host</var>' specifies the host name of the server.  `<var>key</var>' specifies the key of a record.  `<var>value</var>' specifies the value of a record.  `<var>func</var> specifies the name of the function.  `<var>arg</var>' specifies the arguments of the function.  `<var>dpath</var>' specifies the destination file.  `<var>file</var>' specifies the input file.  `<var>upath</var>' specifies the update log directory.  `<var>mhost</var>' specifies the host name of the replication master.  `<var>url</var>' specifies the target URL.</p>
 
@@ -475,7 +479,7 @@ var {
 
 <p>Remote database is a set of interfaces to use an abstract database of Tokyo Cabinet, mediated by a server of Tokyo Tyrant.  See `<code>tcrdb.h</code>' for entire specification.</p>
 
-<h3>Description</h3>
+<h3 id="clientprog_description">Description</h3>
 
 <p>To use the remote database API, include `<code>tcrdb.h</code>' and related standard header files.  Usually, write the following description near the front of a source file.</p>
 
@@ -490,7 +494,7 @@ var {
 
 <p>Before operations to store or retrieve records, it is necessary to connect the remote database object to the server.  The function `<code>tcrdbopen</code>' is used to open a database connection and the function `<code>tcrdbclose</code>' is used to close the connection.</p>
 
-<h3>API</h3>
+<h3 id="tcrdbapi_api">API</h3>
 
 <p>The function `tcrdberrmsg' is used in order to get the message string corresponding to an error code.</p>
 
@@ -919,7 +923,7 @@ var {
 <dd>Because the object of the return value is created with the function `tclistnew', it should be deleted with the function `tclistdel' when it is no longer in use.</dd>
 </dl>
 
-<h3>API of the Table Extension</h3>
+<h3 id="tcrdbapi_apitbl">API of the Table Extension</h3>
 
 <p>The function `tcrdbtblput' is used in order to store a record into a remote database object.</p>
 
@@ -1075,7 +1079,7 @@ var {
 <dd>Because the object of the return value is created with the function `tcmapnew', it should be deleted with the function `tcmapdel' when it is no longer in use.</dd>
 </dl>
 
-<h3>Example Code</h3>
+<h3 id="tcrdbapi_example">Example Code</h3>
 
 <p>The following code is an example to use a remote database.</p>
 
@@ -1130,7 +1134,90 @@ int main(int argc, char **argv){
 }
 </pre>
 
-<h3>How to Use the Library</h3>
+<p>The following code is an example to use a remote database with the table extension.</p>
+
+<pre>#include &lt;tcrdb.h&gt;
+#include &lt;stdlib.h&gt;
+#include &lt;stdbool.h&gt;
+#include &lt;stdint.h&gt;
+
+int main(int argc, char **argv){
+
+  TCRDB *rdb;
+  int ecode, pksiz, i, rsiz;
+  char pkbuf[256];
+  const char *rbuf, *name;
+  TCMAP *cols;
+  RDBQRY *qry;
+  TCLIST *res;
+
+  /* create the object */
+  rdb = tcrdbnew();
+
+  /* connect to the server */
+  if(!tcrdbopen(rdb, "localhost", 1978)){
+    ecode = tcrdbecode(rdb);
+    fprintf(stderr, "open error: %s\n", tcrdberrmsg(ecode));
+  }
+
+  /* store a record */
+  pksiz = sprintf(pkbuf, "%ld", (long)tcrdbtblgenuid(rdb));
+  cols = tcmapnew3("name", "mikio", "age", "30", "lang", "ja,en,c", NULL);
+  if(!tcrdbtblput(rdb, pkbuf, pksiz, cols)){
+    ecode = tcrdbecode(rdb);
+    fprintf(stderr, "put error: %s\n", tcrdberrmsg(ecode));
+  }
+  tcmapdel(cols);
+
+  /* store a record in a naive way */
+  pksiz = sprintf(pkbuf, "12345");
+  cols = tcmapnew();
+  tcmapput2(cols, "name", "falcon");
+  tcmapput2(cols, "age", "31");
+  tcmapput2(cols, "lang", "ja");
+  if(!tcrdbtblput(rdb, pkbuf, pksiz, cols)){
+    ecode = tcrdbecode(rdb);
+    fprintf(stderr, "put error: %s\n", tcrdberrmsg(ecode));
+  }
+  tcmapdel(cols);
+
+  /* search for records */
+  qry = tcrdbqrynew(rdb);
+  tcrdbqryaddcond(qry, "age", RDBQCNUMGE, "20");
+  tcrdbqryaddcond(qry, "lang", RDBQCSTROR, "ja,en");
+  tcrdbqrysetorder(qry, "name", RDBQOSTRASC);
+  tcrdbqrysetmax(qry, 10);
+  res = tcrdbqrysearch(qry);
+  for(i = 0; i &lt; tclistnum(res); i++){
+    rbuf = tclistval(res, i, &amp;rsiz);
+    cols = tcrdbtblget(rdb, rbuf, rsiz);
+    if(cols){
+      printf("%s", rbuf);
+      tcmapiterinit(cols);
+      while((name = tcmapiternext2(cols)) != NULL){
+        printf("\t%s\t%s", name, tcmapget2(cols, name));
+      }
+      printf("\n");
+      tcmapdel(cols);
+    }
+  }
+  tclistdel(res);
+  tcrdbqrydel(qry);
+
+  /* close the connection */
+  if(!tcrdbclose(rdb)){
+    ecode = tcrdbecode(rdb);
+    fprintf(stderr, "close error: %s\n", tcrdberrmsg(ecode));
+  }
+
+  /* delete the object */
+  tcrdbdel(rdb);
+
+  return 0;
+}
+</pre>
+
+<h3 id="tcrdbapi_uselib">How to Use the Library</h3>
 
 <p>The API of C is available by programs conforming to the C89 (ANSI C) standard or the C99 standard.  As the header files of Tokyo Tyrant are provided as `<code>tcrdb.h</code>', applications should include it to use the API.  As the library is provided as `<code>libtokyotyrant.a</code>' and `<code>libtokyotyrant.so</code>' and they depends `<code>libtokyocabinet.so</code>', `<code>libz.so</code>', `<code>libbz2.so</code>', `<code>libresolv.so</code>', `<code>libnsl.so</code>', `<code>libdl.so</code>', `<code>librt.so</code>', `<code>libpthread.so</code>', `<code>libm.so</code>', and `<code>libc.so</code>', linker options `<code>-ltokyotyrant</code>', `<code>-ltokyocabinet</code>', `<code>-lz</code>', `<code>-lbz2</code>', `<code>-lresolv</code>', `<code>-lnsl</code>', `<code>-ldl</code>', `<code>-lrt</code>', `<code>-lpthread</code>', `<code>-lm</code>', and `<code>-lc</code>' are required for build command.  A typical build command is the following.</p>
 
@@ -1147,7 +1234,7 @@ int main(int argc, char **argv){
 
 <p>The database server can starts reading a Lua script file by the `<code>-ext</code>' option.  Clients can call functions defined in the script file by the `<code>tcrdbext</code>' function of the remote database API.</p>
 
-<h3>User-defined Functions</h3>
+<h3 id="luaext_userfunc">User-defined Functions</h3>
 
 <p>You can define some arbitrary functions in the script file.  Each function receives two string parameters of the key and the value.  The return value is sent back to the client.  If the function returns `nil', the server send the error code to the client.</p>
 
@@ -1155,7 +1242,7 @@ int main(int argc, char **argv){
 
 <p>Note that instances of Lua interpreter are handled separately by each native thread. Because global variables of Lua are not useful to share some data among native threads or sessions, shared data should be handled in the database or by the stash functions.</p>
 
-<h3>Built-in Functions</h3>
+<h3 id="luaext_builtinfunc">Built-in Functions</h3>
 
 <p>The following build-in functions for database operations are available in user defined functions.  The type of `key' and `value' parameters should be string or number.  If number is given, it is converted as decimal string.</p>
 
@@ -1318,7 +1405,7 @@ int main(int argc, char **argv){
 
 <p>The global variable `<code>_version</code>' contains the version information of the server.  The global variable `<code>_pid</code>' contains the process ID.  The global variable `<code>_sid</code>' contains the server ID.  The global variable `<code>_thnum</code>' contains the number of native threads.  The global variable `<code>_thid</code>' contains the ID number of each native thread.</p>
 
-<h3>Example Code</h3>
+<h3 id="luaext_example">Example Code</h3>
 
 <p>The following code is an example to increment the record value and store as a decimal number string.  This function should be called with the record locking option to ensure atomicity.</p>
 
@@ -1678,7 +1765,7 @@ end
 
 <h2 id="tutorial">Tutorial</h2>
 
-<h3>Basic Use</h3>
+<h3 id="tutorial_basic">Basic Use</h3>
 
 <p>After installation of Tokyo Tyrant, you can start the server immediately by executing the command `<code>ttserver</code>' in the terminal.  By default, the server listens to the port 1978 and serves as the accessor of an on-memory hash database, which is useful to store cache data.</p>
 
@@ -1733,7 +1820,7 @@ end
 <pre>[terminal-1]$ rm casket.tch
 </pre>
 
-<h3>Daemon</h3>
+<h3 id="tutorial_daemon">Daemon</h3>
 
 <p>To run the server as a daemon process, specify the option `<code>-dmn</code>'.  Moreover, the option `<code>-pid</code>' should be specified to record the process ID into a file.  Note that the current directory of the daemon process is changed to the root directory.  So, the file path parameter should be expressed as the absolute path.</p>
 
@@ -1752,7 +1839,7 @@ end
 
 <p>By default, the database file and the related files are placed under `<code>/var/ttserver</code>'.  Because `<code>ttservctl</code>' is a tiny shell script, copy and edit it for your purpose.  Also, it is suitable to install the modified script into `<code>/etc/init.d</code>' and set symbolic links from `<code>/etc/rc3.d/S98ttserver</code>' and `<code>/etc/rc5.d/S98ttserver</code>'.</p>
 
-<h3>Backup and Recovery</h3>
+<h3 id="tutorial_backup">Backup and Recovery</h3>
 
 <p>Let's run the server again to continue this tutorial.</p>
 
@@ -1792,7 +1879,7 @@ end
 <pre>[terminal-1]$ rm casket.tch backup.tch
 </pre>
 
-<h3>Update Log</h3>
+<h3 id="tutorial_ulog">Update Log</h3>
 
 <p>Let's run the server with update logging enabled.  The option `<code>-ulog</code>' specifies the directory to contain the update log files.</p>
 
@@ -1834,7 +1921,7 @@ end
 <pre>[terminal-1]$ rm -rf casket.tch ulog ulog-back
 </pre>
 
-<h3>Replication</h3>
+<h3 id="tutorial_replication">Replication</h3>
 
 <p>Replication is a mechanism to synchronize two or more database servers for high availability and high integrity.  The replication source server is called "master" and each destination server is called "slave".  Replication requires the following preconditions.</p>
 
@@ -1905,7 +1992,7 @@ end
 
 <p>Tokyo Tyrant supports "dual master" replication which realizes higher availability.  To do it, run two servers which replicate each other.</p>
 
-<h3>Setting Replication on Demand</h3>
+<h3 id="tutorial_repondemand">Setting Replication on Demand</h3>
 
 <p>You can set replication of the running database service without any downtime.  First, prepare the following script for backup operation and save it as "ttbackup.sh" with executable permission (0755).</p>
 
@@ -1975,7 +2062,7 @@ cp -f "$srcpath" "$destpath"
 [terminal-2]$ rm -rf casket-2.tch ulog-2 2.rts
 </pre>
 
-<h3>Tuning</h3>
+<h3 id="tutorial_tuning">Tuning</h3>
 
 <p>If you use a hash database, set the tuning parameter "#bnum=<var>xxx</var>" to improve performance.  It specifies the bucket number and should be more than the number of record to be stored.</p>
 
@@ -1983,7 +2070,7 @@ cp -f "$srcpath" "$destpath"
 
 <p>If huge number of clients access the server, make sure the limit number of file descriptors per process is cleared.  By default on most systems, it is set as 1024.  If so, use `<code>ulimit</code>' to clear it.</p>
 
-<h3>Lua Extension</h3>
+<h3 id="tutorial_luaext">Lua Extension</h3>
 
 <p>If you want more complex database operations than existing ones, use the Lua extension.  For example, prepare the following script and save it as "test.lua".  There is a function "fibonacci" which returns the Fibonacci number of a number of the key.</p>
 
@@ -2037,9 +2124,9 @@ end
 [terminal-2]$ tcrmgr ext localhost fibnext
 </pre>
 
-<p>As you see, the called function receives two string parameters of the key and the value.  The return value is sent back to the client.  You can use such built-in functions for database operations as "_put", "_out", "_get", and so on.  There is a sample file `<code>/usr/local/share/tokyotyrant/senatus.lua</code>'.</p>
+<p>As you see, the called function receives two string parameters of the key and the value.  The return value is sent back to the client.  You can use such built-in functions for database operations as "_put", "_out", "_get", and so on.  There is a sample file `<code>ext/senatus.lua</code>'.</p>
 
-<h3>Using memcached Client</h3>
+<h3 id="tutorial_memcached">Using memcached Client</h3>
 
 <p>This section describes how to use a memcached client library of Perl (Cache::Memcached) with Tokyo Tyrant.  Run the server of Tokyo Tyrant as usual.  And, the following script is a typical example.</p>
 
@@ -2063,7 +2150,7 @@ printf("three: %s\n", $val-&gt;{three});
 $memd-&gt;delete('one');
 </pre>
 
-<h3>Using HTTP Client</h3>
+<h3 id="tutorial_http">Using HTTP Client</h3>
 
 <p>This section describes how to use an HTTP client library of Perl (LWP::UserAgent) with Tokyo Tyrant.  Run the server of Tokyo Tyrant as usual.  And, the following script is a typical example.</p>
 
@@ -2095,6 +2182,49 @@ $res = $ua-&gt;request($req);
 if($res-&gt;is_success()){
     printf("%s\n", $res-&gt;content());
 }
+</pre>
+
+<h3 id="tutorial_expcache">Persistent but Expirable Cache</h3>
+
+<p>If you want to cache data like session information for your Web application but want to avoid data loss because of the server crash, using Tokyo Tyrant can be the solution, that is to say, "persistent" expirable cache.  It requires the following preconditions.</p>
+
+<ul>
+<li>The server must open a table database.</li>
+<li>Clients should store each record with an expiration date column.</li>
+<li>The database should have an index for the expiration date column.</li>
+<li>The server must periodically call the user defined function provided through the Lua extension.</li>
+</ul>
+
+<p>First, prepare the following script for expiration and save it as "ttexpire.lua".  It will expire records where the value of the "x" column exceeds the current date.</p>
+
+<pre>function expire()
+   local args = {};
+   local cdate = string.format("%d", _time())
+   table.insert(args, "addcond\0x\0NUMLE\0" .. cdate)
+   table.insert(args, "out")
+   local res = _misc("search", args)
+   if not res then
+      _log("expiration was failed")
+   end
+end
+</pre>
+
+<p>Start the server by opening a table database which has the index for the "x" column, and by scheduling it to call the expiration function per second.</p>
+
+<pre>[terminal-1]$ ttserver -ext ttexpire.lua -extpc expire 1.0 "casket.tct#idx=x:dec"
+</pre>
+
+<p>Store test records from another terminal.</p>
+
+<pre>[terminal-2]$ now=`date +%s`
+for((i=1;i&lt;=60;i++)); do
+  tcrmgr put -sep '|' localhost "$i" "x|$((now+i))"
+done
+</pre>
+
+<p>You can confirm that the records are being removed by expiration.</p>
+
+<pre>[terminal-2]$ tcrmgr list -pv -sep '|' localhost
 </pre>
 
 <hr />

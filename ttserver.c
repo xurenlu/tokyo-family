@@ -79,6 +79,15 @@ typedef struct {                         // type of structure of master synchron
   bool recon;
 } REPLARG;
 
+typedef struct {                         // type of structure of periodic command
+  const char *name;
+  TCADB *adb;
+  TCULOG *ulog;
+  uint32_t sid;
+  REPLARG *sarg;
+  void *scrext;
+} EXTPCARG;
+
 typedef struct {                         // type of structure of task opaque object
   uint64_t mask;
   TCADB *adb;
@@ -108,9 +117,10 @@ static int proc(const char *dbname, const char *host, int port, int thnum, int t
                 bool dmn, const char *pidpath, const char *logpath,
                 const char *ulogpath, uint64_t ulim, bool uas, uint32_t sid,
                 const char *mhost, int mport, const char *rtspath, const char *extpath,
-                uint64_t mask);
+                const TCLIST *extpcs, uint64_t mask);
 static void do_log(int level, const char *msg, void *opq);
 static void do_slave(void *opq);
+static void do_extpc(void *opq);
 static void do_task(TTSOCK *sock, void *opq, TTREQ *req);
 static int tokenize(char *str, char **tokens, int max);
 static uint32_t recmtxidx(const char *kbuf, int ksiz);
@@ -169,6 +179,7 @@ int main(int argc, char **argv){
   char *mhost = NULL;
   char *rtspath = NULL;
   char *extpath = NULL;
+  TCLIST *extpcs = NULL;
   int port = DEFPORT;
   int thnum = DEFTHNUM;
   int tout = 0;
@@ -227,6 +238,12 @@ int main(int argc, char **argv){
       } else if(!strcmp(argv[i], "-ext")){
         if(++i >= argc) usage();
         extpath = argv[i];
+      } else if(!strcmp(argv[i], "-extpc")){
+        if(!extpcs) extpcs = tclistnew2(1);
+        if(++i >= argc) usage();
+        tclistpush2(extpcs, argv[i]);
+        if(++i >= argc) usage();
+        tclistpush2(extpcs, argv[i]);
       } else if(!strcmp(argv[i], "-mask")){
         if(++i >= argc) usage();
         mask |= getcmdmask(argv[i]);
@@ -263,8 +280,9 @@ int main(int argc, char **argv){
   if(!rtspath) rtspath = DEFRTSPATH;
   g_serv = ttservnew();
   int rv = proc(dbname, host, port, thnum, tout, dmn, pidpath, logpath,
-                ulogpath, ulim, uas, sid, mhost, mport, rtspath, extpath, mask);
+                ulogpath, ulim, uas, sid, mhost, mport, rtspath, extpath, extpcs, mask);
   ttservdel(g_serv);
+  if(extpcs) tclistdel(extpcs);
   return rv;
 }
 
@@ -276,8 +294,8 @@ static void usage(void){
   fprintf(stderr, "usage:\n");
   fprintf(stderr, "  %s [-host name] [-port num] [-thnum num] [-tout num]"
           " [-dmn] [-pid path] [-log path] [-ld|-le] [-ulog path] [-ulim num] [-uas] [-sid num]"
-          " [-mhost name] [-mport num] [-rts path] [-ext path] [-mask expr] [-unmask expr]"
-          " [dbname]\n", g_progname);
+          " [-mhost name] [-mport num] [-rts path] [-ext path] [-extpc name period]"
+          " [-mask expr] [-unmask expr] [dbname]\n", g_progname);
   fprintf(stderr, "\n");
   exit(1);
 }
@@ -382,7 +400,7 @@ static int proc(const char *dbname, const char *host, int port, int thnum, int t
                 bool dmn, const char *pidpath, const char *logpath,
                 const char *ulogpath, uint64_t ulim, bool uas, uint32_t sid,
                 const char *mhost, int mport, const char *rtspath, const char *extpath,
-                uint64_t mask){
+                const TCLIST *extpcs, uint64_t mask){
   LOGARG larg;
   larg.fd = 1;
   ttservsetloghandler(g_serv, do_log, &larg);
@@ -516,7 +534,31 @@ static int proc(const char *dbname, const char *host, int port, int thnum, int t
   sarg.sid = sid;
   sarg.fail = false;
   sarg.recon = false;
-  if(!(mask & TTMSKSLAVE)) ttservsettimedhandler(g_serv, 1.0, do_slave, &sarg);
+  if(!(mask & TTMSKSLAVE)) ttservaddtimedhandler(g_serv, 1.0, do_slave, &sarg);
+  EXTPCARG *pcargs = NULL;
+  int pcnum = 0;
+  if(extpath && extpcs){
+    pcnum = tclistnum(extpcs) / 2;
+    pcargs = tcmalloc(sizeof(*pcargs) * pcnum);
+    for(int i = 0; i < pcnum; i++){
+      const char *name = tclistval2(extpcs, i * 2);
+      double period = tcatof(tclistval2(extpcs, i * 2 + 1));
+      EXTPCARG *pcarg = pcargs + i;
+      pcarg->name = name;
+      pcarg->adb = adb;
+      pcarg->ulog = ulog;
+      pcarg->sid = sid;
+      pcarg->sarg = &sarg;
+      pcarg->scrext = scrextnew(thnum, thnum + i, extpath, adb, ulog, sid, scrstash,
+                                scrlcks, RECMTXNUM, do_log);
+      if(pcarg->scrext){
+        if(*name && period > 0) ttservaddtimedhandler(g_serv, period, do_extpc, pcarg);
+      } else {
+        err = true;
+        ttservlog(g_serv, TTLOGERROR, "scrextnew failed");
+      }
+    }
+  }
   TASKARG targ;
   targ.mask = mask;
   targ.adb = adb;
@@ -552,6 +594,16 @@ static int proc(const char *dbname, const char *host, int port, int thnum, int t
     }
     if(!ttservstart(g_serv)) err = true;
   } while(g_restart);
+  if(pcargs){
+    for(int i = 0; i < pcnum; i++){
+      EXTPCARG *pcarg = pcargs + i;
+      if(pcarg->scrext && !scrextdel(pcarg->scrext)){
+        err = true;
+        ttservlog(g_serv, TTLOGERROR, "scrextdel failed");
+      }
+    }
+    tcfree(pcargs);
+  }
   for(int i = 0; i < RECMTXNUM; i++){
     if(pthread_mutex_destroy(targ.rmtxs + i) != 0)
       ttservlog(g_serv, TTLOGERROR, "pthread_mutex_destroy failed");
@@ -666,6 +718,17 @@ static void do_slave(void *opq){
   }
   pthread_cleanup_pop(1);
   if(close(rtsfd) == -1) ttservlog(g_serv, TTLOGERROR, "do_slave: close failed");
+}
+
+
+/* perform an extension command */
+static void do_extpc(void *opq){
+  EXTPCARG *arg = (EXTPCARG *)opq;
+  const char *name = arg->name;
+  void *scr = arg->scrext;
+  int xsiz;
+  char *xbuf = scrextcallmethod(scr, name, "", 0, "", 0, &xsiz);
+  tcfree(xbuf);
 }
 
 

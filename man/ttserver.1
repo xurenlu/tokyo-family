@@ -5,11 +5,11 @@ ttserver \- the server of Tokyo Tyrant
 
 .SH DESCRIPTION
 .PP
-The command `\fBttserver\fR' runs the server managing a database instance.  Because the database is treated by the abstract API of Tokyo Cabinet, you can choose the scheme on start\-up of the server.  Supported schema are on\-memory database, hash database, and B+ tree database.  This command is used in the following format.  `\fIdbname\fR' specifies the database name.  If it is omitted, on\-memory database is specified.
+The command `\fBttserver\fR' runs the server managing a database instance.  Because the database is treated by the abstract API of Tokyo Cabinet, you can choose the scheme on start\-up of the server.  Supported schema are on\-memory hash database, on\-memory tree database, hash database, and B+ tree database.  This command is used in the following format.  `\fIdbname\fR' specifies the database name.  If it is omitted, on\-memory hash database is specified.
 .PP
 .RS
 .br
-\fBttserver \fR[\fB\-host \fIname\fB\fR]\fB \fR[\fB\-port \fInum\fB\fR]\fB \fR[\fB\-th\fInum\fB \fInum\fB\fR]\fB \fR[\fB\-tout \fInum\fB\fR]\fB \fR[\fB\-dmn\fR]\fB \fR[\fB\-pid \fIpath\fB\fR]\fB \fR[\fB\-log \fIpath\fB\fR]\fB \fR[\fB\-ld\fR|\fB\-le\fR]\fB \fR[\fB\-ulog \fIpath\fB\fR]\fB \fR[\fB\-ulim \fInum\fB\fR]\fB \fR[\fB\-uas\fR]\fB \fR[\fB\-sid \fInum\fB\fR]\fB \fR[\fB\-mhost \fIname\fB\fR]\fB \fR[\fB\-mport \fInum\fB\fR]\fB \fR[\fB\-rts \fIpath\fB\fR]\fB \fR[\fB\-ext \fIpath\fB\fR]\fB \fR[\fB\fIdbname\fB\fR]\fB\fR
+\fBttserver \fR[\fB\-host \fIname\fB\fR]\fB \fR[\fB\-port \fInum\fB\fR]\fB \fR[\fB\-th\fInum\fB \fInum\fB\fR]\fB \fR[\fB\-tout \fInum\fB\fR]\fB \fR[\fB\-dmn\fR]\fB \fR[\fB\-pid \fIpath\fB\fR]\fB \fR[\fB\-log \fIpath\fB\fR]\fB \fR[\fB\-ld\fR|\fB\-le\fR]\fB \fR[\fB\-ulog \fIpath\fB\fR]\fB \fR[\fB\-ulim \fInum\fB\fR]\fB \fR[\fB\-uas\fR]\fB \fR[\fB\-sid \fInum\fB\fR]\fB \fR[\fB\-mhost \fIname\fB\fR]\fB \fR[\fB\-mport \fInum\fB\fR]\fB \fR[\fB\-rts \fIpath\fB\fR]\fB \fR[\fB\-ext \fIpath\fB\fR]\fB \fR[\fB\-extpc \fIname\fB \fIperiod\fB\fR]\fB \fR[\fB\-mask \fIexpr\fB\fR]\fB \fR[\fB\fIdbname\fB\fR]\fB\fR
 .RE
 .PP
 Options feature the following.
@@ -48,6 +48,12 @@ Options feature the following.
 \fB\-rts \fIpath\fR\fR : specify the replication time stamp file.
 .br
 \fB\-ext \fIpath\fR\fR : specify the script language extension file.
+.br
+\fB\-extpc \fIname\fR \fIperiod\fR\fR : specify the function name and the calling period of a periodic command.
+.br
+\fB\-mask \fIexpr\fR\fR : specify the names of forbidden commands.
+.br
+\fB\-unmask \fIexpr\fR\fR : specify the names of allowed commands.
 .br
 .RE
 .PP

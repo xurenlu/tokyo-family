@@ -1317,7 +1317,7 @@ static int proctable(const char *host, int port, int cnum, int rnum){
       int type = types[myrand(sizeof(types) / sizeof(*types))];
       tcrdbqrysetorder(qry, name, type);
     }
-    if(myrand(3) != 0) tcrdbqrysetmax(qry, myrand(i));
+    tcrdbqrysetmax(qry, myrand(10));
     TCLIST *res = tcrdbqrysearch(qry);
     tclistdel(res);
     tcrdbqrydel(qry);

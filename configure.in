@@ -7,11 +7,11 @@
 #================================================================
 
 # Package name
-AC_INIT(tokyotyrant, 1.1.13)
+AC_INIT(tokyotyrant, 1.1.14)
 
 # Package information
 MYLIBVER=2
-MYLIBREV=4
+MYLIBREV=5
 MYPROTVER="0.9"
 
 # Targets
@@ -23,7 +23,7 @@ MYINITFILES="ttservctl"
 MYMAN1FILES="ttserver.1 ttulmgr.1 ttultest.1 tcrtest.1 tcrmttest.1 tcrmgr.1"
 MYMAN3FILES="ttutil.3 tculog.3 tcrdb.3"
 MYMAN8FILES="ttservctl.8"
-MYSCREXTFILES="senatus.lua usherette.lua"
+MYSCREXTFILES="ext"
 MYDOCUMENTFILES="COPYING ChangeLog THANKS doc"
 MYPCFILES="tokyotyrant.pc"
 
