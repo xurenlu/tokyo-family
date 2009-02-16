@@ -284,6 +284,11 @@ int _tt_epoll_wait(int epfd, struct epoll_event *events, int maxevents, int time
 #define epoll_create   _tt_epoll_create
 #define epoll_ctl      _tt_epoll_ctl
 #define epoll_wait     _tt_epoll_wait
+#define epoll_close    close
+
+#else
+
+#define epoll_close    close
 
 #endif
 

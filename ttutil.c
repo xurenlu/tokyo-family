@@ -27,7 +27,8 @@
 #define SOCKPATHBUFSIZ 108               // size of a socket path buffer
 #define SOCKRCVTIMEO   0.25              // timeout of the recv call of socket
 #define SOCKSNDTIMEO   0.25              // timeout of the send call of socket
-#define HTTPLINEBUFSIZ 2048              // size of a line buffer of HTTP
+#define SOCKLINEBUFSIZ 4096              // size of a line buffer of socket
+#define SOCKLINEMAXSIZ (16*1024*1024)    // maximum size of a line of socket
 #define HTTPBODYMAXSIZ (256*1024*1024)   // maximum size of the entity body of HTTP
 #define TRILLIONNUM    1000000000000     // trillion number
 
@@ -462,6 +463,35 @@ bool ttsockgets(TTSOCK *sock, char *buf, int size){
 }
 
 
+/* Receive one line by a socket into allocated buffer. */
+char *ttsockgets2(TTSOCK *sock){
+  assert(sock);
+  bool err = false;
+  TCXSTR *xstr = tcxstrnew3(SOCKLINEBUFSIZ);
+  pthread_cleanup_push((void (*)(void *))tcxstrdel, xstr);
+  int size = 0;
+  while(true){
+    int c = ttsockgetc(sock);
+    if(c == '\n') break;
+    if(c == -1){
+      err = true;
+      break;
+    }
+    if(c != '\r'){
+      unsigned char b = c;
+      tcxstrcat(xstr, &b, sizeof(b));
+      size++;
+      if(size >= SOCKLINEMAXSIZ){
+        err = true;
+        break;
+      }
+    }
+  }
+  pthread_cleanup_pop(0);
+  return tcxstrtomalloc(xstr);
+}
+
+
 /* Receive an 32-bit integer by a socket. */
 uint32_t ttsockgetint32(TTSOCK *sock){
   assert(sock);
@@ -556,8 +586,8 @@ int tthttpfetch(const char *url, TCMAP *reqheads, TCMAP *resheads, TCXSTR *resbo
       }
       tcxstrprintf(obuf, "\r\n", host);
       if(ttsocksend(sock, tcxstrptr(obuf), tcxstrsize(obuf))){
-        char line[HTTPLINEBUFSIZ];
-        if(ttsockgets(sock, line, HTTPLINEBUFSIZ) && tcstrfwm(line, "HTTP/")){
+        char line[SOCKLINEBUFSIZ];
+        if(ttsockgets(sock, line, SOCKLINEBUFSIZ) && tcstrfwm(line, "HTTP/")){
           tcstrsqzspc(line);
           const char *rp = strchr(line, ' ');
           code = tcatoi(rp + 1);
@@ -566,7 +596,7 @@ int tthttpfetch(const char *url, TCMAP *reqheads, TCMAP *resheads, TCXSTR *resbo
         if(code > 0){
           int clen = 0;
           bool chunked = false;
-          while(ttsockgets(sock, line, HTTPLINEBUFSIZ) && *line != '\0'){
+          while(ttsockgets(sock, line, SOCKLINEBUFSIZ) && *line != '\0'){
             tcstrsqzspc(line);
             char *pv = strchr(line, ':');
             if(!pv) continue;
@@ -590,12 +620,12 @@ int tthttpfetch(const char *url, TCMAP *reqheads, TCMAP *resheads, TCXSTR *resbo
               body = tcmemdup("", 0);
               bsiz = 0;
             } else if(chunked){
-              int asiz = HTTPLINEBUFSIZ;
+              int asiz = SOCKLINEBUFSIZ;
               body = tcmalloc(asiz);
               bsiz = 0;
               while(true){
                 pthread_cleanup_push(free, body);
-                if(!ttsockgets(sock, line, HTTPLINEBUFSIZ)) err = true;
+                if(!ttsockgets(sock, line, SOCKLINEBUFSIZ)) err = true;
                 pthread_cleanup_pop(0);
                 if(err || *line == '\0') break;
                 int size = strtol(line, NULL, 16);
@@ -631,7 +661,7 @@ int tthttpfetch(const char *url, TCMAP *reqheads, TCMAP *resheads, TCXSTR *resbo
                 pthread_cleanup_pop(0);
               }
             } else {
-              int asiz = HTTPLINEBUFSIZ;
+              int asiz = SOCKLINEBUFSIZ;
               body = tcmalloc(asiz);
               bsiz = 0;
               while(true){
@@ -1012,9 +1042,9 @@ bool ttservstart(TTSERV *serv){
       ttservlog(serv, TTLOGERROR, "pthread_join failed");
     }
   }
-  if(close(epfd) != 0){
+  if(epoll_close(epfd) != 0){
     err = true;
-    ttservlog(serv, TTLOGERROR, "close failed");
+    ttservlog(serv, TTLOGERROR, "epoll_close failed");
   }
   if(serv->port < 1 && unlink(serv->host) == -1){
     err = true;

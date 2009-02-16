@@ -190,6 +190,15 @@ void ttsockungetc(TTSOCK *sock, int c);
 bool ttsockgets(TTSOCK *sock, char *buf, int size);
 
 
+/* Receive one line by a socket into allocated buffer.
+   `sock' specifies the socket object.
+   If successful, the return value is the pointer to the result buffer, else, it is `NULL'.
+   `NULL' is returned if the socket is closed before receiving linefeed.
+   Because  the region of the return value is allocated with the `malloc' call, it should be
+   released with the `free' call when it is no longer in use. */
+char *ttsockgets2(TTSOCK *sock);
+
+
 /* Receive an 32-bit integer by a socket.
    `sock' specifies the socket object.
    The return value is the 32-bit integer. */
@@ -410,8 +419,8 @@ bool ttserviskilled(TTSERV *serv);
  *************************************************************************************************/
 
 
-#define _TT_VERSION    "1.1.14"
-#define _TT_LIBVER     205
+#define _TT_VERSION    "1.1.15"
+#define _TT_LIBVER     206
 #define _TT_PROTVER    "0.9"
 
 

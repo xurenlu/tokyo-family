@@ -1,3 +1,13 @@
+2009-02-13  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	* ttutil.c (ttsockgets2): new function.
+
+	* ttserver (do_task): the size limit of each query was cleared.
+
+	* tcrdb.c (tcrdbqrysearchget): "column" expression was changed to "get".
+
+	- Release: 1.1.15
+
 2009-02-05  Mikio Hirabayashi  <mikio@users.sourceforge.net>
 
 	* ttutil.c (ttservstart, ttservaddtimedhandler): multiple tasks are now supported.

@@ -26,7 +26,7 @@
 #define DEFRTSPATH     "ttserver.rts"    // default name of the RTS file
 #define NUMBUFSIZ      32                // size of a numeric buffer
 #define LINEBUFSIZ     8192              // size of a line buffer
-#define MAXTOKENS      256               // maximum number of tokens
+#define TOKENUNIT      256               // unit number of tokens
 #define RECMTXNUM      31                // number of mutexes of records
 #define STASHBNUM      1021              // bucket number of the script stash object
 
@@ -122,7 +122,7 @@ static void do_log(int level, const char *msg, void *opq);
 static void do_slave(void *opq);
 static void do_extpc(void *opq);
 static void do_task(TTSOCK *sock, void *opq, TTREQ *req);
-static int tokenize(char *str, char **tokens, int max);
+static char **tokenize(char *str, int *np);
 static uint32_t recmtxidx(const char *kbuf, int ksiz);
 static void do_put(TTSOCK *sock, TASKARG *arg, TTREQ *req);
 static void do_putkeep(TTSOCK *sock, TASKARG *arg, TTREQ *req);
@@ -819,10 +819,10 @@ static void do_task(TTSOCK *sock, void *opq, TTREQ *req){
     }
   } else {
     ttsockungetc(sock, c);
-    char line[LINEBUFSIZ];
-    if(ttsockgets(sock, line, LINEBUFSIZ)){
-      char *tokens[MAXTOKENS];
-      int tnum = tokenize(line, tokens, MAXTOKENS);
+    char *line = ttsockgets2(sock);
+    if(line){
+      int tnum;
+      char **tokens = tokenize(line, &tnum);
       if(tnum > 0){
         const char *cmd = tokens[0];
         if(!strcmp(cmd, "set")){
@@ -867,18 +867,26 @@ static void do_task(TTSOCK *sock, void *opq, TTREQ *req){
           }
         }
       }
+      tcfree(tokens);
+      tcfree(line);
     }
   }
 }
 
 
 /* tokenize a string */
-static int tokenize(char *str, char **tokens, int max){
+static char **tokenize(char *str, int *np){
+  int anum = TOKENUNIT;
+  char **tokens = tcmalloc(sizeof(*tokens) * anum);
   int tnum = 0;
   while(*str == ' ' || *str == '\t'){
     str++;
   }
-  while(*str != '\0' && tnum < max){
+  while(*str != '\0'){
+    if(tnum >= anum){
+      anum *= 2;
+      tokens = tcrealloc(tokens, sizeof(*tokens) * anum);
+    }
     tokens[tnum++] = str;
     while(*str != '\0' && *str != ' ' && *str != '\t'){
       str++;
@@ -887,7 +895,8 @@ static int tokenize(char *str, char **tokens, int max){
       *(str++) = '\0';
     }
   }
-  return tnum;
+  *np = tnum;
+  return tokens;
 }
 
 

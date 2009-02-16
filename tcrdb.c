@@ -1428,7 +1428,7 @@ bool tcrdbqrysearchout(RDBQRY *qry){
 TCLIST *tcrdbqrysearchget(RDBQRY *qry){
   assert(qry);
   TCLIST *args = tclistdup(qry->args);
-  tclistpush2(args, "columns");
+  tclistpush2(args, "get");
   TCLIST *rv = tcrdbmisc(qry->rdb, "search", 0, args);
   tclistdel(args);
   return rv;
