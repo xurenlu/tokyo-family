@@ -417,7 +417,7 @@ static int proc(const char *dbname, const char *host, int port, int thnum, int t
       ttservlog(g_serv, TTLOGINFO, "warning: ulog(%s) is not the absolute path", ulogpath);
     if(mport == 0 && mhost && *mhost != MYPATHCHR)
       ttservlog(g_serv, TTLOGINFO, "warning: mhost(%s) is not the absolute path", mhost);
-    if(rtspath && *rtspath != MYPATHCHR)
+    if(mhost && rtspath && *rtspath != MYPATHCHR)
       ttservlog(g_serv, TTLOGINFO, "warning: rts(%s) is not the absolute path", rtspath);
     if(extpath && *extpath != MYPATHCHR)
       ttservlog(g_serv, TTLOGINFO, "warning: ext(%s) is not the absolute path", extpath);
@@ -434,9 +434,9 @@ static int proc(const char *dbname, const char *host, int port, int thnum, int t
   if(pidpath){
     char *numstr = tcreadfile(pidpath, -1, NULL);
     if(numstr){
-      int pid = tcatoi(numstr);
+      int64_t pid = tcatoi(numstr);
       tcfree(numstr);
-      ttservlog(g_serv, TTLOGERROR, "process %d may be already running", pid);
+      ttservlog(g_serv, TTLOGERROR, "process %lld may be already running", (long long)pid);
       return 1;
     }
   }
@@ -453,16 +453,17 @@ static int proc(const char *dbname, const char *host, int port, int thnum, int t
       return 1;
     }
   }
-  int pid = getpid();
-  ttservlog(g_serv, TTLOGSYSTEM, "--------- logging started [%d] --------", pid);
+  int64_t pid = getpid();
+  ttservlog(g_serv, TTLOGSYSTEM, "--------- logging started [%lld] --------", (long long)pid);
   if(pidpath){
     char buf[32];
-    sprintf(buf, "%d\n", pid);
+    sprintf(buf, "%lld\n", (long long)pid);
     if(!tcwritefile(pidpath, buf, strlen(buf))){
       ttservlog(g_serv, TTLOGERROR, "tcwritefile failed");
       return 1;
     }
-    ttservlog(g_serv, TTLOGSYSTEM, "process ID configuration: path=%s pid=%d", pidpath, pid);
+    ttservlog(g_serv, TTLOGSYSTEM, "process ID configuration: path=%s pid=%lld",
+              pidpath, (long long)pid);
   }
   ttservlog(g_serv, TTLOGSYSTEM, "server configuration: host=%s port=%d",
             host ? host : "(any)", port);
@@ -1850,7 +1851,7 @@ static void do_stat(TTSOCK *sock, TASKARG *arg, TTREQ *req){
     double now = tctime();
     wp += sprintf(wp, "version\t%s\n", ttversion);
     wp += sprintf(wp, "time\t%.6f\n", now);
-    wp += sprintf(wp, "pid\t%d\n", getpid());
+    wp += sprintf(wp, "pid\t%lld\n", (long long)getpid());
     wp += sprintf(wp, "sid\t%d\n", arg->sid);
     switch(tcadbomode(adb)){
     case ADBOVOID: wp += sprintf(wp, "type\tvoid\n"); break;
@@ -2346,10 +2347,10 @@ static void do_mc_stats(TTSOCK *sock, TASKARG *arg, TTREQ *req, char **tokens, i
   if(mask & (TTMSKSTAT | TTMSKALLMC | TTMSKALLREAD)){
     ttservlog(g_serv, TTLOGINFO, "do_mc_stats: forbidden");
   } else {
-    wp += sprintf(wp, "STAT pid %d\r\n", getpid());
+    wp += sprintf(wp, "STAT pid %lld\r\n", (long long)getpid());
     time_t now = time(NULL);
-    wp += sprintf(wp, "STAT uptime %lld\r\n", (long long int)(now - (int)g_starttime));
-    wp += sprintf(wp, "STAT time %lld\r\n", (long long int)now);
+    wp += sprintf(wp, "STAT uptime %lld\r\n", (long long)(now - (int)g_starttime));
+    wp += sprintf(wp, "STAT time %lld\r\n", (long long)now);
     wp += sprintf(wp, "STAT version %s\r\n", ttversion);
     struct rusage ubuf;
     memset(&ubuf, 0, sizeof(ubuf));
@@ -2359,8 +2360,8 @@ static void do_mc_stats(TTSOCK *sock, TASKARG *arg, TTREQ *req, char **tokens, i
       wp += sprintf(wp, "STAT rusage_system %d.%06d\r\n",
                     (int)ubuf.ru_stime.tv_sec, (int)ubuf.ru_stime.tv_usec);
     }
-    wp += sprintf(wp, "STAT curr_items %lld\r\n", (long long int)tcadbrnum(adb));
-    wp += sprintf(wp, "STAT bytes %lld\r\n", (long long int)tcadbsize(adb));
+    wp += sprintf(wp, "STAT curr_items %lld\r\n", (long long)tcadbrnum(adb));
+    wp += sprintf(wp, "STAT bytes %lld\r\n", (long long)tcadbsize(adb));
     wp += sprintf(wp, "END\r\n");
   }
   if(ttsocksend(sock, stack, wp - stack)){

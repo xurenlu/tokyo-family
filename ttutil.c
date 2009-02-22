@@ -934,6 +934,10 @@ bool ttservstart(TTSERV *serv){
           } else {
             cfd = ttacceptsock(lfd, addr, &port);
           }
+          if(epoll_reassoc(epfd, lfd) != 0){
+            if(cfd != -1) close(cfd);
+            cfd = -1;
+          }
           if(cfd != -1){
             ttservlog(serv, TTLOGINFO, "connected: %s:%d", addr, port);
             struct epoll_event ev;

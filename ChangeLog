@@ -1,3 +1,11 @@
+2009-02-16  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	* tcrdb.h: the macro "RDBITOPT" was added.
+
+	* mycond.h, mycond.c, ttutil.c: Solaris portability was added thanks to tamtam.
+
+	- Release: 1.1.16
+
 2009-02-13  Mikio Hirabayashi  <mikio@users.sourceforge.net>
 
 	* ttutil.c (ttsockgets2): new function.

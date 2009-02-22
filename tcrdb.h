@@ -361,7 +361,7 @@ double tcrdbadddouble(TCRDB *rdb, const void *kbuf, int ksiz, double num);
 /* Call a function of the scripting language extension.
    `rdb' specifies the remote database object.
    `name' specifies the function name.
-   `opts' specifies options by bitwise or: `RDBXOLCKREC' for record locking, `RDBXOLCKGLB' for
+   `opts' specifies options by bitwise-or: `RDBXOLCKREC' for record locking, `RDBXOLCKGLB' for
    global locking.
    `kbuf' specifies the pointer to the region of the key.
    `ksiz' specifies the size of the region of the key.
@@ -382,7 +382,7 @@ void *tcrdbext(TCRDB *rdb, const char *name, int opts,
 /* Call a function of the scripting language extension.
    `rdb' specifies the remote database object.
    `name' specifies the function name.
-   `opts' specifies options by bitwise or: `RDBXOLCKREC' for record locking, `RDBXOLCKGLB' for
+   `opts' specifies options by bitwise-or: `RDBXOLCKREC' for record locking, `RDBXOLCKGLB' for
    global locking.
    `kstr' specifies the string of the key.
    `vstr' specifies the string of the value.
@@ -467,7 +467,7 @@ char *tcrdbstat(TCRDB *rdb);
    empty list.  "getlist" is to retrieve records.  It receives keys, and returns keys and values
    of corresponding records one after the other.  Table database supports "setindex", "search",
    and "genuid".
-   `opts' specifies options by bitwise or: `RDBMONOULOG' for omission of the update log.
+   `opts' specifies options by bitwise-or: `RDBMONOULOG' for omission of the update log.
    `args' specifies a list object containing arguments.
    If successful, the return value is a list object of the result.  `NULL' is returned on failure.
    Because the object of the return value is created with the function `tclistnew', it
@@ -484,6 +484,7 @@ TCLIST *tcrdbmisc(TCRDB *rdb, const char *name, int opts, const TCLIST *args);
 enum {                                   /* enumeration for index types */
   RDBITLEXICAL = TDBITLEXICAL,           /* lexical string */
   RDBITDECIMAL = TDBITDECIMAL,           /* decimal string */
+  RDBITOPT = TDBITOPT,                   /* optimize */
   RDBITVOID = TDBITVOID,                 /* void */
   RDBITKEEP = TDBITKEEP                  /* keep existing index */
 };
@@ -575,8 +576,9 @@ TCMAP *tcrdbtblget(TCRDB *rdb, const void *pkbuf, int pksiz);
    `name' specifies the name of a column.  If the name of an existing index is specified, the
    index is rebuilt.  An empty string means the primary key.
    `type' specifies the index type: `RDBITLEXICAL' for lexical string, `RDBITDECIMAL' for decimal
-   string.  If it is `RDBITVOID', the index is removed.  If `RDBITKEEP' is added by bitwise or
-   and the index exists, this function merely returns failure.
+   string.  If it is `RDBITOPT', the index is optimized.  If it is `RDBITVOID', the index is
+   removed.  If `RDBITKEEP' is added by bitwise-or and the index exists, this function merely
+   returns failure.
    If successful, the return value is true, else, it is false.
    Note that the setting indexes should be set after the database is opened. */
 bool tcrdbtblsetindex(TCRDB *rdb, const char *name, int type);
@@ -613,7 +615,7 @@ void tcrdbqrydel(RDBQRY *qry);
    greater than or equal to the expression, `RDBQCNUMLT' for number which is less than the
    expression, `RDBQCNUMLE' for number which is less than or equal to the expression, `RDBQCNUMBT'
    for number which is between two tokens of the expression, `RDBQCNUMOREQ' for number which is
-   equal to at least one token in the expression.  All operations can be flagged by bitwise or:
+   equal to at least one token in the expression.  All operations can be flagged by bitwise-or:
    `RDBQCNEGATE' for negation, `RDBQCNOIDX' for using no index.
    `expr' specifies an operand exression. */
 void tcrdbqryaddcond(RDBQRY *qry, const char *name, int op, const char *expr);

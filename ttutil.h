@@ -419,8 +419,8 @@ bool ttserviskilled(TTSERV *serv);
  *************************************************************************************************/
 
 
-#define _TT_VERSION    "1.1.15"
-#define _TT_LIBVER     206
+#define _TT_VERSION    "1.1.16"
+#define _TT_LIBVER     207
 #define _TT_PROTVER    "0.9"
 
 

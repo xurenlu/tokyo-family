@@ -91,7 +91,8 @@
 
 #endif
 
-#if !defined(_SYS_LINUX_) && !defined(_SYS_FREEBSD_) && !defined(_SYS_MACOSX_)
+#if !defined(_SYS_LINUX_) && !defined(_SYS_FREEBSD_) && !defined(_SYS_MACOSX_) && \
+  !defined(_SYS_SUNOS_)
 #error =======================================
 #error Your platform is not supported.  Sorry.
 #error =======================================
@@ -213,9 +214,22 @@
 
 #if defined(_SYS_FREEBSD_) || defined(_SYS_MACOSX_)
 #define TTUSEKQUEUE    1
+#elif defined(_SYS_SUNOS_)
+
+/* to check the possilibity of compilation on Linux
+
+#define port_create() (1)
+#define port_associate(aaa, bbb, ccc, ddd, eee) (0)
+#define port_dissociate(aaa, bbb, ccc) (0)
+typedef struct { int portev_object; } port_event_t;
+#define port_getn(aaa, bbb, ccc, ddd, eee) (0)
+#define PORT_SOURCE_FD 0
+*/
+
+#include <sys/loadavg.h>
+#define TTUSEEVPORTS   1
 #else
 #include <sys/epoll.h>
-#define TTUSEKQUEUE    0
 #endif
 
 
@@ -255,7 +269,7 @@ int _tt_dummyfuncv(int a, ...);
  *************************************************************************************************/
 
 
-#if TTUSEKQUEUE
+#if defined(TTUSEKQUEUE) || defined(TTUSEEVPORTS)
 
 struct epoll_event {
   uint32_t events;
@@ -279,15 +293,18 @@ enum {
 
 int _tt_epoll_create(int size);
 int _tt_epoll_ctl(int epfd, int op, int fd, struct epoll_event *event);
+int _tt_epoll_reassoc(int epfd, int fd);
 int _tt_epoll_wait(int epfd, struct epoll_event *events, int maxevents, int timeout);
 
 #define epoll_create   _tt_epoll_create
 #define epoll_ctl      _tt_epoll_ctl
+#define epoll_reassoc  _tt_epoll_reassoc
 #define epoll_wait     _tt_epoll_wait
 #define epoll_close    close
 
 #else
 
+#define epoll_reassoc(TC_epfd, TC_fd)  0
 #define epoll_close    close
 
 #endif

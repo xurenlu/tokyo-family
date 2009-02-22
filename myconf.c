@@ -39,7 +39,7 @@ int _tt_dummyfuncv(int a, ...){
  *************************************************************************************************/
 
 
-#if TTUSEKQUEUE
+#if defined(TTUSEKQUEUE)
 
 
 #include <sys/event.h>
@@ -78,6 +78,11 @@ int _tt_epoll_ctl(int epfd, int op, int fd, struct epoll_event *event){
 }
 
 
+int _tt_epoll_reassoc(int epfd, int fd){
+  return 0;
+}
+
+
 int _tt_epoll_wait(int epfd, struct epoll_event *events, int maxevents, int timeout){
   div_t td = div(timeout, 1000);
   struct timespec ts;
@@ -90,6 +95,70 @@ int _tt_epoll_wait(int epfd, struct epoll_event *events, int maxevents, int time
     events[i].data.fd = kevs[i].ident;
   }
   return num;
+}
+
+
+#elif defined(TTUSEEVPORTS)
+
+
+#include <port.h>
+
+
+int _tt_epoll_create(int size){
+  int port = port_create();
+  if(port < 0) return -1;
+  return port;
+}
+
+
+int _tt_epoll_ctl(int epfd, int op, int fd, struct epoll_event *event){
+  if(op == EPOLL_CTL_ADD || op == EPOLL_CTL_MOD){
+    if(event->events & EPOLLIN){
+      int result = port_associate(epfd, PORT_SOURCE_FD, fd, POLLIN, event);
+      if(result == -1) return -1;
+      return 0;
+    } else {
+      return -1;
+    }
+  } else if(op == EPOLL_CTL_DEL){
+    int result = port_dissociate(epfd, PORT_SOURCE_FD, fd);
+    if(result == -1) return -1;
+    return 0;
+  }
+  return -1;
+}
+
+
+int _tt_epoll_reassoc(int epfd, int fd){
+  struct epoll_event ev;
+  ev.events = EPOLLIN;
+  ev.data.fd = fd;
+  if(epoll_ctl(epfd, EPOLL_CTL_MOD, fd, &ev) != 0) return -1;
+  return 0;
+}
+
+
+int _tt_epoll_wait(int epfd, struct epoll_event *events, int maxevents, int timeout){
+  div_t td = div(timeout, 1000);
+  struct timespec ts;
+  ts.tv_sec = td.quot;
+  ts.tv_nsec = td.rem * 1000000;
+  port_event_t list[maxevents];
+  unsigned int actevents = maxevents;
+  if(port_getn(epfd, list, 0, &actevents, &ts) == -1) return -1;
+  if(actevents == 0) actevents = 1;
+  if(actevents > maxevents) actevents = maxevents;
+  if(port_getn(epfd, list, maxevents, &actevents, &ts) == -1){
+    if(errno == EINTR){
+      return 0;
+    } else if(errno != ETIME){
+      return -1;
+    }
+  }
+  for(int i = 0; i < actevents; i++){
+    events[i].data.fd = list[i].portev_object;
+  }
+  return actevents;
 }
 
 
