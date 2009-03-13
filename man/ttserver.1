@@ -9,7 +9,7 @@ The command `\fBttserver\fR' runs the server managing a database instance.  Beca
 .PP
 .RS
 .br
-\fBttserver \fR[\fB\-host \fIname\fB\fR]\fB \fR[\fB\-port \fInum\fB\fR]\fB \fR[\fB\-th\fInum\fB \fInum\fB\fR]\fB \fR[\fB\-tout \fInum\fB\fR]\fB \fR[\fB\-dmn\fR]\fB \fR[\fB\-pid \fIpath\fB\fR]\fB \fR[\fB\-log \fIpath\fB\fR]\fB \fR[\fB\-ld\fR|\fB\-le\fR]\fB \fR[\fB\-ulog \fIpath\fB\fR]\fB \fR[\fB\-ulim \fInum\fB\fR]\fB \fR[\fB\-uas\fR]\fB \fR[\fB\-sid \fInum\fB\fR]\fB \fR[\fB\-mhost \fIname\fB\fR]\fB \fR[\fB\-mport \fInum\fB\fR]\fB \fR[\fB\-rts \fIpath\fB\fR]\fB \fR[\fB\-ext \fIpath\fB\fR]\fB \fR[\fB\-extpc \fIname\fB \fIperiod\fB\fR]\fB \fR[\fB\-mask \fIexpr\fB\fR]\fB \fR[\fB\fIdbname\fB\fR]\fB\fR
+\fBttserver \fR[\fB\-host \fIname\fB\fR]\fB \fR[\fB\-port \fInum\fB\fR]\fB \fR[\fB\-th\fInum\fB \fInum\fB\fR]\fB \fR[\fB\-tout \fInum\fB\fR]\fB \fR[\fB\-dmn\fR]\fB \fR[\fB\-pid \fIpath\fB\fR]\fB \fR[\fB\-kl\fR]\fB \fR[\fB\-log \fIpath\fB\fR]\fB \fR[\fB\-ld\fR|\fB\-le\fR]\fB \fR[\fB\-ulog \fIpath\fB\fR]\fB \fR[\fB\-ulim \fInum\fB\fR]\fB \fR[\fB\-uas\fR]\fB \fR[\fB\-sid \fInum\fB\fR]\fB \fR[\fB\-mhost \fIname\fB\fR]\fB \fR[\fB\-mport \fInum\fB\fR]\fB \fR[\fB\-rts \fIpath\fB\fR]\fB \fR[\fB\-ext \fIpath\fB\fR]\fB \fR[\fB\-extpc \fIname\fB \fIperiod\fB\fR]\fB \fR[\fB\-mask \fIexpr\fB\fR]\fB \fR[\fB\fIdbname\fB\fR]\fB\fR
 .RE
 .PP
 Options feature the following.
@@ -26,6 +26,8 @@ Options feature the following.
 \fB\-dmn\fR : work as a daemon process.
 .br
 \fB\-pid \fIpath\fR\fR : output the process ID into the file.
+.br
+\fB\-kl\fR : kill the existing process if the process ID file is detected.
 .br
 \fB\-log \fIpath\fR\fR : output log messages into the file.
 .br

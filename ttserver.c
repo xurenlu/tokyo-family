@@ -114,7 +114,7 @@ static uint64_t getcmdmask(const char *expr);
 static void sigtermhandler(int signum);
 static void sigchldhandler(int signum);
 static int proc(const char *dbname, const char *host, int port, int thnum, int tout,
-                bool dmn, const char *pidpath, const char *logpath,
+                bool dmn, const char *pidpath, bool kl, const char *logpath,
                 const char *ulogpath, uint64_t ulim, bool uas, uint32_t sid,
                 const char *mhost, int mport, const char *rtspath, const char *extpath,
                 const TCLIST *extpcs, uint64_t mask);
@@ -184,6 +184,7 @@ int main(int argc, char **argv){
   int thnum = DEFTHNUM;
   int tout = 0;
   bool dmn = false;
+  bool kl = false;
   uint64_t ulim = 0;
   bool uas = false;
   uint32_t sid = 0;
@@ -208,6 +209,8 @@ int main(int argc, char **argv){
       } else if(!strcmp(argv[i], "-pid")){
         if(++i >= argc) usage();
         pidpath = argv[i];
+      } else if(!strcmp(argv[i], "-kl")){
+        kl = true;
       } else if(!strcmp(argv[i], "-log")){
         if(++i >= argc) usage();
         logpath = argv[i];
@@ -279,7 +282,7 @@ int main(int argc, char **argv){
   }
   if(!rtspath) rtspath = DEFRTSPATH;
   g_serv = ttservnew();
-  int rv = proc(dbname, host, port, thnum, tout, dmn, pidpath, logpath,
+  int rv = proc(dbname, host, port, thnum, tout, dmn, pidpath, kl, logpath,
                 ulogpath, ulim, uas, sid, mhost, mport, rtspath, extpath, extpcs, mask);
   ttservdel(g_serv);
   if(extpcs) tclistdel(extpcs);
@@ -293,8 +296,8 @@ static void usage(void){
   fprintf(stderr, "\n");
   fprintf(stderr, "usage:\n");
   fprintf(stderr, "  %s [-host name] [-port num] [-thnum num] [-tout num]"
-          " [-dmn] [-pid path] [-log path] [-ld|-le] [-ulog path] [-ulim num] [-uas] [-sid num]"
-          " [-mhost name] [-mport num] [-rts path] [-ext path] [-extpc name period]"
+          " [-dmn] [-pid path] [-kl] [-log path] [-ld|-le] [-ulog path] [-ulim num] [-uas]"
+          " [-sid num] [-mhost name] [-mport num] [-rts path] [-ext path] [-extpc name period]"
           " [-mask expr] [-unmask expr] [dbname]\n", g_progname);
   fprintf(stderr, "\n");
   exit(1);
@@ -397,7 +400,7 @@ static void sigchldhandler(int signum){
 
 /* perform the command */
 static int proc(const char *dbname, const char *host, int port, int thnum, int tout,
-                bool dmn, const char *pidpath, const char *logpath,
+                bool dmn, const char *pidpath, bool kl, const char *logpath,
                 const char *ulogpath, uint64_t ulim, bool uas, uint32_t sid,
                 const char *mhost, int mport, const char *rtspath, const char *extpath,
                 const TCLIST *extpcs, uint64_t mask){
@@ -433,10 +436,34 @@ static int proc(const char *dbname, const char *host, int port, int thnum, int t
     ttservlog(g_serv, TTLOGINFO, "warning: ulog(%s) is not a directory", ulogpath);
   if(pidpath){
     char *numstr = tcreadfile(pidpath, -1, NULL);
+    if(numstr && kl){
+      int64_t pid = tcatoi(numstr);
+      tcfree(numstr);
+      ttservlog(g_serv, TTLOGINFO,
+                "warning: killing the process %lld with SIGTERM", (long long)pid);
+      if(kill(pid, SIGTERM) != 0) ttservlog(g_serv, TTLOGERROR, "kill failed");
+      int cnt = 0;
+      while(true){
+        usleep(1000 * 100);
+        if((numstr = tcreadfile(pidpath, -1, NULL)) != NULL){
+          tcfree(numstr);
+        } else {
+          break;
+        }
+        if(++cnt >= 100){
+          ttservlog(g_serv, TTLOGINFO,
+                    "warning: killing the process %lld with SIGKILL", (long long)pid);
+          if(kill(pid, SIGKILL) != 0) ttservlog(g_serv, TTLOGERROR, "kill failed");
+          unlink(pidpath);
+          break;
+        }
+      }
+      numstr = tcreadfile(pidpath, -1, NULL);
+    }
     if(numstr){
       int64_t pid = tcatoi(numstr);
       tcfree(numstr);
-      ttservlog(g_serv, TTLOGERROR, "process %lld may be already running", (long long)pid);
+      ttservlog(g_serv, TTLOGERROR, "the process %lld may be already running", (long long)pid);
       return 1;
     }
   }
@@ -2221,7 +2248,7 @@ static void do_mc_delete(TTSOCK *sock, TASKARG *arg, TTREQ *req, char **tokens, 
   } else if(tculogadbout(ulog, sid, adb, kbuf, ksiz)){
     len = sprintf(stack, "DELETED\r\n");
   } else {
-    len = sprintf(stack, "NOT_STORED\r\n");
+    len = sprintf(stack, "NOT_FOUND\r\n");
   }
   if(nr || ttsocksend(sock, stack, len)){
     req->keep = true;
@@ -2263,15 +2290,17 @@ static void do_mc_incr(TTSOCK *sock, TASKARG *arg, TTREQ *req, char **tokens, in
     char *vbuf = tcadbget(adb, kbuf, ksiz, &vsiz);
     if(vbuf){
       num += strtoll(vbuf, NULL, 10);
+      if(num < 0) num = 0;
+      len = sprintf(stack, "%lld", (long long)num);
+      if(tculogadbput(ulog, sid, adb, kbuf, ksiz, stack, len)){
+        len = sprintf(stack, "%lld\r\n", (long long)num);
+      } else {
+        len = sprintf(stack, "SERVER_ERROR unexpected\r\n");
+        ttservlog(g_serv, TTLOGERROR, "do_mc_incr: operation failed");
+      }
       tcfree(vbuf);
-    }
-    if(num < 0) num = 0;
-    len = sprintf(stack, "%lld", (long long)num);
-    if(tculogadbput(ulog, sid, adb, kbuf, ksiz, stack, len)){
-      len = sprintf(stack, "%lld\r\n", (long long)num);
     } else {
-      len = sprintf(stack, "SERVER_ERROR unexpected\r\n");
-      ttservlog(g_serv, TTLOGERROR, "do_mc_incr: operation failed");
+      len = sprintf(stack, "NOT_FOUND\r\n");
     }
     if(pthread_mutex_unlock(rmtxs + mtxidx) != 0)
       ttservlog(g_serv, TTLOGERROR, "do_mc_incr: pthread_mutex_unlock failed");
@@ -2316,15 +2345,17 @@ static void do_mc_decr(TTSOCK *sock, TASKARG *arg, TTREQ *req, char **tokens, in
     char *vbuf = tcadbget(adb, kbuf, ksiz, &vsiz);
     if(vbuf){
       num += strtoll(vbuf, NULL, 10);
+      if(num < 0) num = 0;
+      len = sprintf(stack, "%lld", (long long)num);
+      if(tculogadbput(ulog, sid, adb, kbuf, ksiz, stack, len)){
+        len = sprintf(stack, "%lld\r\n", (long long)num);
+      } else {
+        len = sprintf(stack, "SERVER_ERROR unexpected\r\n");
+        ttservlog(g_serv, TTLOGERROR, "do_mc_decr: operation failed");
+      }
       tcfree(vbuf);
-    }
-    if(num < 0) num = 0;
-    len = sprintf(stack, "%lld", (long long)num);
-    if(tculogadbput(ulog, sid, adb, kbuf, ksiz, stack, len)){
-      len = sprintf(stack, "%lld\r\n", (long long)num);
     } else {
-      len = sprintf(stack, "SERVER_ERROR unexpected\r\n");
-      ttservlog(g_serv, TTLOGERROR, "do_mc_decr: operation failed");
+      len = sprintf(stack, "NOT_FOUND\r\n");
     }
     if(pthread_mutex_unlock(rmtxs + mtxidx) != 0)
       ttservlog(g_serv, TTLOGERROR, "do_mc_decr: pthread_mutex_unlock failed");

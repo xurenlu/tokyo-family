@@ -1,4 +1,4 @@
-.TH "INTRO" 3 "2009-02-04" "Man Page" "Tokyo Cabinet"
+.TH "INTRO" 3 "2009-03-09" "Man Page" "Tokyo Cabinet"
 
 
 .SH TOKYO TYRANT: NETWORK INTERFACE OF TOKYO CABINET
@@ -25,11 +25,13 @@ License
 
 .SH INTRODUCTION
 .PP
-Tokyo Tyrant is a package of network interface to the DBM called Tokyo Cabinet.  Though the DBM has high performance, you might bother in case that multiple processes share the same database, or remote processes access the database.  Thus, Tokyo Tyrant is provided for concurrent and remote connections to Tokyo Cabinet.  It is composed of the server process managing a database and its access library for client applications.  The server can embed Lua, a lightweight script language so that you can define arbitrary operations of the database.
+Tokyo Tyrant is a package of network interface to the DBM called Tokyo Cabinet.  Though the DBM has high performance, you might bother in case that multiple processes share the same database, or remote processes access the database.  Thus, Tokyo Tyrant is provided for concurrent and remote connections to Tokyo Cabinet.  It is composed of the server process managing a database and its access library for client applications.
 .PP
-The server features high concurrency due to thread\-pool modeled implementation and the epoll/kqueue mechanism of the modern Linux/*BSD kernel.  The server and its clients communicate with each other by simple binary protocol on TCP/IP.  Protocols compatible with memcached and HTTP/1.1 are also supported so that almost all principal platforms and programming languages can use Tokyo Tyrant.  High availability and high integrity are also featured due to such mechanisms as hot backup, update logging, and replication.
+The server features high concurrency due to thread\-pool modeled implementation and the epoll/kqueue mechanism of the modern Linux/*BSD kernel.  The server and its clients communicate with each other by simple binary protocol on TCP/IP.  Protocols compatible with memcached and HTTP/1.1 are also supported so that almost all principal platforms and programming languages can use Tokyo Tyrant.  High availability and high integrity are also featured due to such mechanisms as hot backup, update logging, and replication.  The server can embed Lua, a lightweight script language so that you can define arbitrary operations of the database.
 .PP
-As for now, the server works on Linux, FreeBSD, Mac OS X only.
+Because the server uses the abstract API of Tokyo Cabinet, all of the six APIs: the on\-memory hash database API, the on\-memory tree database API, the hash API, the B+ tree database API, the fixed\-length database API, and the table database API, are available from the client with the common interface.  Moreover, the table extension is provided to use specifidc features of the table database.
+.PP
+As for now, the server works on Linux, FreeBSD, Mac OS X, Solaris only.
 
 .SH INSTALLATION
 .PP
@@ -57,7 +59,7 @@ The command `\fBttserver\fR' runs the server managing a database instance.  Beca
 .PP
 .RS
 .br
-\fBttserver \fR[\fB\-host \fIname\fB\fR]\fB \fR[\fB\-port \fInum\fB\fR]\fB \fR[\fB\-th\fInum\fB \fInum\fB\fR]\fB \fR[\fB\-tout \fInum\fB\fR]\fB \fR[\fB\-dmn\fR]\fB \fR[\fB\-pid \fIpath\fB\fR]\fB \fR[\fB\-log \fIpath\fB\fR]\fB \fR[\fB\-ld\fR|\fB\-le\fR]\fB \fR[\fB\-ulog \fIpath\fB\fR]\fB \fR[\fB\-ulim \fInum\fB\fR]\fB \fR[\fB\-uas\fR]\fB \fR[\fB\-sid \fInum\fB\fR]\fB \fR[\fB\-mhost \fIname\fB\fR]\fB \fR[\fB\-mport \fInum\fB\fR]\fB \fR[\fB\-rts \fIpath\fB\fR]\fB \fR[\fB\-ext \fIpath\fB\fR]\fB \fR[\fB\-mask \fIexpr\fB\fR]\fB \fR[\fB\fIdbname\fB\fR]\fB\fR
+\fBttserver \fR[\fB\-host \fIname\fB\fR]\fB \fR[\fB\-port \fInum\fB\fR]\fB \fR[\fB\-th\fInum\fB \fInum\fB\fR]\fB \fR[\fB\-tout \fInum\fB\fR]\fB \fR[\fB\-dmn\fR]\fB \fR[\fB\-pid \fIpath\fB\fR]\fB \fR[\fB\-kl\fR]\fB \fR[\fB\-log \fIpath\fB\fR]\fB \fR[\fB\-ld\fR|\fB\-le\fR]\fB \fR[\fB\-ulog \fIpath\fB\fR]\fB \fR[\fB\-ulim \fInum\fB\fR]\fB \fR[\fB\-uas\fR]\fB \fR[\fB\-sid \fInum\fB\fR]\fB \fR[\fB\-mhost \fIname\fB\fR]\fB \fR[\fB\-mport \fInum\fB\fR]\fB \fR[\fB\-rts \fIpath\fB\fR]\fB \fR[\fB\-ext \fIpath\fB\fR]\fB \fR[\fB\-extpc \fIname\fB \fIperiod\fB\fR]\fB \fR[\fB\-mask \fIexpr\fB\fR]\fB \fR[\fB\fIdbname\fB\fR]\fB\fR
 .RE
 .PP
 Options feature the following.
@@ -74,6 +76,8 @@ Options feature the following.
 \fB\-dmn\fR : work as a daemon process.
 .br
 \fB\-pid \fIpath\fR\fR : output the process ID into the file.
+.br
+\fB\-kl\fR : kill the existing process if the process ID file is detected.
 .br
 \fB\-log \fIpath\fR\fR : output log messages into the file.
 .br
@@ -96,6 +100,8 @@ Options feature the following.
 \fB\-rts \fIpath\fR\fR : specify the replication time stamp file.
 .br
 \fB\-ext \fIpath\fR\fR : specify the script language extension file.
+.br
+\fB\-extpc \fIname\fR \fIperiod\fR\fR : specify the function name and the calling period of a periodic command.
 .br
 \fB\-mask \fIexpr\fR\fR : specify the names of forbidden commands.
 .br
@@ -1075,7 +1081,7 @@ The function `tcrdbext' is used in order to call a function of the script langua
 `\fIname\fR' specifies the function name.
 .RE
 .RS
-`\fIopts\fR' specifies options by bitwise or: `RDBXOLCKREC' for record locking, `RDBXOLCKGLB' for global locking.
+`\fIopts\fR' specifies options by bitwise\-or: `RDBXOLCKREC' for record locking, `RDBXOLCKGLB' for global locking.
 .RE
 .RS
 `\fIkbuf\fR' specifies the pointer to the region of the key.
@@ -1112,7 +1118,7 @@ The function `tcrdbext2' is used in order to call a function of the script langu
 `\fIname\fR' specifies the function name.
 .RE
 .RS
-`\fIopts\fR' specifies options by bitwise or: `RDBXOLCKREC' for record locking, `RDBXOLCKGLB' for global locking.
+`\fIopts\fR' specifies options by bitwise\-or: `RDBXOLCKREC' for record locking, `RDBXOLCKGLB' for global locking.
 .RE
 .RS
 `\fIkstr\fR' specifies the string of the key.
@@ -1265,7 +1271,7 @@ The function `tcrdbmisc' is used in order to call a versatile function for misce
 `\fIname\fR' specifies the name of the function.  All databases support "put", "out", "get", "putlist", "outlist", and "getlist".  "put" is to store a record.  It receives a key and a value, and returns an empty list.  "out" is to remove a record.  It receives a key, and returns an empty list.  "get" is to retrieve a record.  It receives a key, and returns a list of the values.  "putlist" is to store records.  It receives keys and values one after the other, and returns an empty list.  "outlist" is to remove records.  It receives keys, and returns an empty list.  "getlist" is to retrieve records.  It receives keys, and returns keys and values of corresponding records one after the other.
 .RE
 .RS
-`\fIopts\fR' specifies options by bitwise or: `RDBMONOULOG' for omission of the update log.
+`\fIopts\fR' specifies options by bitwise\-or: `RDBMONOULOG' for omission of the update log.
 .RE
 .RS
 `\fIargs\fR' specifies a list object containing arguments.
@@ -1408,7 +1414,7 @@ The function `tcrdbtblsetindex' is used in order to set a column index to a remo
 `\fIname\fR' specifies the name of a column.  If the name of an existing index is specified, the index is rebuilt.  An empty string means the primary key.
 .RE
 .RS
-`\fItype\fR' specifies the index type: `RDBITLEXICAL' for lexical string, `RDBITDECIMAL' for decimal string.  If it is `RDBITVOID', the index is removed.  If `RDBITKEEP' is added by bitwise or and the index exists, this function merely returns failure.
+`\fItype\fR' specifies the index type: `RDBITLEXICAL' for lexical string, `RDBITDECIMAL' for decimal string.  If it is `RDBITOPT', the index is optimized.  If it is `RDBITVOID', the index is removed.  If `RDBITKEEP' is added by bitwise\-or and the index exists, this function merely returns failure.
 .RE
 .RS
 If successful, the return value is true, else, it is false.
@@ -1466,7 +1472,7 @@ The function `tcrdbqryaddcond' is used in order to add a narrowing condition to 
 `\fIname\fR' specifies the name of a column.  An empty string means the primary key.
 .RE
 .RS
-`\fIop\fR' specifies an operation type: `RDBQCSTREQ' for string which is equal to the expression, `RDBQCSTRINC' for string which is included in the expression, `RDBQCSTRBW' for string which begins with the expression, `RDBQCSTREW' for string which ends with the expression, `RDBQCSTRAND' for string which includes all tokens in the expression, `RDBQCSTROR' for string which includes at least one token in the expression, `RDBQCSTROREQ' for string which is equal to at least one token in the expression, `RDBQCSTRRX' for string which matches regular expressions of the expression, `RDBQCNUMEQ' for number which is equal to the expression, `RDBQCNUMGT' for number which is greater than the expression, `RDBQCNUMGE' for number which is greater than or equal to the expression, `RDBQCNUMLT' for number which is less than the expression, `RDBQCNUMLE' for number which is less than or equal to the expression, `RDBQCNUMBT' for number which is between two tokens of the expression, `RDBQCNUMOREQ' for number which is equal to at least one token in the expression.  All operations can be flagged by bitwise or: `RDBQCNEGATE' for negation, `RDBQCNOIDX' for using no index.
+`\fIop\fR' specifies an operation type: `RDBQCSTREQ' for string which is equal to the expression, `RDBQCSTRINC' for string which is included in the expression, `RDBQCSTRBW' for string which begins with the expression, `RDBQCSTREW' for string which ends with the expression, `RDBQCSTRAND' for string which includes all tokens in the expression, `RDBQCSTROR' for string which includes at least one token in the expression, `RDBQCSTROREQ' for string which is equal to at least one token in the expression, `RDBQCSTRRX' for string which matches regular expressions of the expression, `RDBQCNUMEQ' for number which is equal to the expression, `RDBQCNUMGT' for number which is greater than the expression, `RDBQCNUMGE' for number which is greater than or equal to the expression, `RDBQCNUMLT' for number which is less than the expression, `RDBQCNUMLE' for number which is less than or equal to the expression, `RDBQCNUMBT' for number which is between two tokens of the expression, `RDBQCNUMOREQ' for number which is equal to at least one token in the expression.  All operations can be flagged by bitwise\-or: `RDBQCNEGATE' for negation, `RDBQCNOIDX' for using no index.
 .RE
 .RS
 `\fIexpr\fR' specifies an operand exression.
@@ -1489,16 +1495,19 @@ The function `tcrdbqrysetorder' is used in order to set the order of a query obj
 .RE
 .RE
 .PP
-The function `tcrdbqrysetmax' is used in order to set the maximum number of records of the result of a query object.
+The function `tcrdbqrysetlimit' is used in order to set the limit number of records of the result of a query object.
 .PP
 .RS
 .br
-\fBvoid tcrdbqrysetmax(RDBQRY *\fIqry\fB, int \fImax\fB);\fR
+\fBvoid tcrdbqrysetlimit(RDBQRY *\fIqry\fB, int \fImax\fB, int \fIskip\fB);\fR
 .RS
 `\fIqry\fR' specifies the query object.
 .RE
 .RS
-`\fImax\fR' specifies the maximum number of records of the result.
+`\fImax\fR' specifies the maximum number of records of the result.  If it is negative, no limit is specified.
+.RE
+.RS
+`\fIskip\fR' specifies the number of skipped records of the result.  If it is not more than 0, no record is skipped.
 .RE
 .RE
 .PP
@@ -1569,6 +1578,8 @@ Because the object of the return value is created with the function `tcmapnew', 
 .SH EXAMPLE CODE
 .PP
 The following code is an example to use a remote database.
+.PP
+The following code is an example to use a remote database with the table extension.
 
 .SH HOW TO USE THE LIBRARY
 .PP
@@ -2688,9 +2699,9 @@ iteration: Arbitrary data of the element
 .PP
 To finish the session, the client can shutdown and close the socket at any time.  If not closed, the connection can be reused for the next session.  If protocol violation or some fatal error occurs, the server immediately breaks the session and closes the connection.
 .PP
-As for the memcached compatible protocol, the server implements the following commands; "set", "add", "replace", "get", "delete", "incr", "decr", "stats", "flush_all", "version", and "quit".  "noreply" options of update commands are also supported.  However, "flags", "exptime", and "cas unique" parameters are ignored.  The limitation size of each query is 8192 bytes except for the entity of the value.
+As for the memcached compatible protocol, the server implements the following commands; "set", "add", "replace", "get", "delete", "incr", "decr", "stats", "flush_all", "version", and "quit".  "noreply" options of update commands are also supported.  However, "flags", "exptime", and "cas unique" parameters are ignored.
 .PP
-As for the HTTP/1.1 compatible protocol, the server implements the following commands; "GET" (relevant to `tcrdbget'), "HEAD" (relevant to `tcrdbvsiz'), "PUT" (relevant to `tcrdbput'), "POST" (relevant to `tcrdbext'), and "DELETE" (relevant to `tcrdbout').  The URI of each request is treated as the key encoded by the URL encoding.  And the entity body is treated as the value.  However, headers except for "Connection" and "Content\-Length" are ignored.  The limitation size of each query is 8192 bytes.  "PUT" can have the header "X\-TT\-PDMODE" whose value is either of 1 (relevant to `tcrdbputkeep'), 2 (relevant to `tcrdbputcat'), or else (relevant to `tcrdbput').  "POST" should have the header "X\-TT\-XNAME" whose value stands for the function name to be called.  "POST" can have the header "X\-TT\-XOPTS" whose value stands for bitwise\-or options of 1 (record locking) and 2 (global locking).
+As for the HTTP/1.1 compatible protocol, the server implements the following commands; "GET" (relevant to `tcrdbget'), "HEAD" (relevant to `tcrdbvsiz'), "PUT" (relevant to `tcrdbput'), "POST" (relevant to `tcrdbext'), and "DELETE" (relevant to `tcrdbout').  The URI of each request is treated as the key encoded by the URL encoding.  And the entity body is treated as the value.  However, headers except for "Connection" and "Content\-Length" are ignored.  "PUT" can have the header "X\-TT\-PDMODE" whose value is either of 1 (relevant to `tcrdbputkeep'), 2 (relevant to `tcrdbputcat'), or else (relevant to `tcrdbput').  "POST" should have the header "X\-TT\-XNAME" whose value stands for the function name to be called.  "POST" can have the header "X\-TT\-XOPTS" whose value stands for bitwise\-or options of 1 (record locking) and 2 (global locking).
 
 .SH TUTORIAL
 
@@ -2841,7 +2852,7 @@ Fibonacci numbers can be generated by another algorithm, which is naive and stat
 .PP
 Then, restart the server and test the new algorithm.
 .PP
-As you see, the called function receives two string parameters of the key and the value.  The return value is sent back to the client.  You can use such built\-in functions for database operations as "_put", "_out", "_get", and so on.  There is a sample file `\fB/usr/local/share/tokyotyrant/senatus.lua\fR'.
+As you see, the called function receives two string parameters of the key and the value.  The return value is sent back to the client.  You can use such built\-in functions for database operations as "_put", "_out", "_get", and so on.  There is a sample file `\fBext/senatus.lua\fR'.
 
 .SH USING MEMCACHED CLIENT
 .PP
@@ -2850,6 +2861,29 @@ This section describes how to use a memcached client library of Perl (Cache::Mem
 .SH USING HTTP CLIENT
 .PP
 This section describes how to use an HTTP client library of Perl (LWP::UserAgent) with Tokyo Tyrant.  Run the server of Tokyo Tyrant as usual.  And, the following script is a typical example.
+
+.SH PERSISTENT BUT EXPIRABLE CACHE
+.PP
+If you want to cache data like session information for your Web application but want to avoid data loss because of the server crash, using Tokyo Tyrant can be the solution, that is to say, "persistent" expirable cache.  It requires the following preconditions.
+.PP
+.RS
+The server must open a table database.
+.br
+Clients should store each record with an expiration date column.
+.br
+The database should have an index for the expiration date column.
+.br
+The server must periodically call the user defined function provided through the Lua extension.
+.br
+.RE
+.PP
+First, prepare the following script for expiration and save it as "ttexpire.lua".  It will expire records where the value of the "x" column exceeds the current date.
+.PP
+Start the server by opening a table database which has the index for the "x" column, and by scheduling it to call the expiration function per second.
+.PP
+Store test records from another terminal.
+.PP
+You can confirm that the records are being removed by expiration.
 
 .SH LICENSE
 .PP

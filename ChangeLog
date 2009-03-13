@@ -1,3 +1,15 @@
+2009-02-19  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	* ttutil.c (tthttpfetch): timeout mechanism was added.
+
+	* ttserver.c (do_mc_delete): mismatch of the error message was resolved.
+
+	* ttserver.c (do_mc_incr, do_mc_decr): behavior became as with the original memcached.
+
+	* tcrdb.c (tcrdbqrysetlimit): new function instead of "tcrdbqrysetmax".
+
+	- Release: 1.1.17
+
 2009-02-16  Mikio Hirabayashi  <mikio@users.sourceforge.net>
 
 	* tcrdb.h: the macro "RDBITOPT" was added.

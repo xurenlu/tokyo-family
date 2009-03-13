@@ -262,7 +262,7 @@ var {
 <p>The command `<code>ttserver</code>' runs the server managing a database instance.  Because the database is treated by the abstract API of Tokyo Cabinet, you can choose the scheme on start-up of the server.  Supported schema are on-memory hash database, on-memory tree database, hash database, and B+ tree database.  This command is used in the following format.  `<var>dbname</var>' specifies the database name.  If it is omitted, on-memory hash database is specified.</p>
 
 <dl class="api">
-<dt><code>ttserver [-host <var>name</var>] [-port <var>num</var>] [-th<var>num</var> <var>num</var>] [-tout <var>num</var>] [-dmn] [-pid <var>path</var>] [-log <var>path</var>] [-ld|-le] [-ulog <var>path</var>] [-ulim <var>num</var>] [-uas] [-sid <var>num</var>] [-mhost <var>name</var>] [-mport <var>num</var>] [-rts <var>path</var>] [-ext <var>path</var>] [-extpc <var>name</var> <var>period</var>] [-mask <var>expr</var>] [<var>dbname</var>]</code></dt>
+<dt><code>ttserver [-host <var>name</var>] [-port <var>num</var>] [-th<var>num</var> <var>num</var>] [-tout <var>num</var>] [-dmn] [-pid <var>path</var>] [-kl] [-log <var>path</var>] [-ld|-le] [-ulog <var>path</var>] [-ulim <var>num</var>] [-uas] [-sid <var>num</var>] [-mhost <var>name</var>] [-mport <var>num</var>] [-rts <var>path</var>] [-ext <var>path</var>] [-extpc <var>name</var> <var>period</var>] [-mask <var>expr</var>] [<var>dbname</var>]</code></dt>
 </dl>
 
 <p>Options feature the following.</p>
@@ -274,6 +274,7 @@ var {
 <li><code>-tout <var>num</var></code> : specify the timeout of each session in seconds.  By default, no timeout is specified.</li>
 <li><code>-dmn</code> : work as a daemon process.</li>
 <li><code>-pid <var>path</var></code> : output the process ID into the file.</li>
+<li><code>-kl</code> : kill the existing process if the process ID file is detected.</li>
 <li><code>-log <var>path</var></code> : output log messages into the file.</li>
 <li><code>-ld</code> : log debug messages also.</li>
 <li><code>-le</code> : log error messages only.</li>
@@ -1035,12 +1036,13 @@ var {
 <dd>`<var>type</var>' specifies the order type: `RDBQOSTRASC' for string ascending, `RDBQOSTRDESC' for string descending, `RDBQONUMASC' for number ascending, `RDBQONUMDESC' for number descending.</dd>
 </dl>
 
-<p>The function `tcrdbqrysetmax' is used in order to set the maximum number of records of the result of a query object.</p>
+<p>The function `tcrdbqrysetlimit' is used in order to set the limit number of records of the result of a query object.</p>
 
 <dl class="api">
-<dt><code>void tcrdbqrysetmax(RDBQRY *<var>qry</var>, int <var>max</var>);</code></dt>
+<dt><code>void tcrdbqrysetlimit(RDBQRY *<var>qry</var>, int <var>max</var>, int <var>skip</var>);</code></dt>
 <dd>`<var>qry</var>' specifies the query object.</dd>
-<dd>`<var>max</var>' specifies the maximum number of records of the result.</dd>
+<dd>`<var>max</var>' specifies the maximum number of records of the result.  If it is negative, no limit is specified.</dd>
+<dd>`<var>skip</var>' specifies the number of skipped records of the result.  If it is not more than 0, no record is skipped.</dd>
 </dl>
 
 <p>The function `tcrdbqrysearch' is used in order to execute the search of a query object.</p>
@@ -1186,7 +1188,7 @@ int main(int argc, char **argv){
   tcrdbqryaddcond(qry, "age", RDBQCNUMGE, "20");
   tcrdbqryaddcond(qry, "lang", RDBQCSTROR, "ja,en");
   tcrdbqrysetorder(qry, "name", RDBQOSTRASC);
-  tcrdbqrysetmax(qry, 10);
+  tcrdbqrysetlimit(qry, 10, 0);
   res = tcrdbqrysearch(qry);
   for(i = 0; i &lt; tclistnum(res); i++){
     rbuf = tclistval(res, i, &amp;rsiz);

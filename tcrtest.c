@@ -1317,7 +1317,7 @@ static int proctable(const char *host, int port, int cnum, int rnum){
       int type = types[myrand(sizeof(types) / sizeof(*types))];
       tcrdbqrysetorder(qry, name, type);
     }
-    tcrdbqrysetmax(qry, myrand(10));
+    tcrdbqrysetlimit(qry, myrand(10), myrand(5) * 10);
     TCLIST *res = tcrdbqrysearch(qry);
     tclistdel(res);
     tcrdbqrydel(qry);
@@ -1330,7 +1330,7 @@ static int proctable(const char *host, int port, int cnum, int rnum){
   RDBQRY *qry = tcrdbqrynew(rdb);
   tcrdbqryaddcond(qry, "", RDBQCSTRBW, "1");
   tcrdbqrysetorder(qry, "str", RDBQOSTRASC);
-  tcrdbqrysetmax(qry, 10);
+  tcrdbqrysetlimit(qry, 10, 0);
   TCLIST *res = tcrdbqrysearchget(qry);
   for(int i = 0; i < tclistnum(res); i++){
     TCMAP *cols = tcrdbqryrescols(res, i);

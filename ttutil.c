@@ -98,6 +98,13 @@ int ttopensock(const char *addr, int port){
     close(fd);
     return -1;
   }
+  struct timeval opttv;
+  opttv.tv_sec = (int)SOCKRCVTIMEO;
+  opttv.tv_usec = (SOCKRCVTIMEO - (int)SOCKRCVTIMEO) * 1000000;
+  setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, (char *)&opttv, sizeof(opttv));
+  opttv.tv_sec = (int)SOCKSNDTIMEO;
+  opttv.tv_usec = (SOCKSNDTIMEO - (int)SOCKSNDTIMEO) * 1000000;
+  setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, (char *)&opttv, sizeof(opttv));
   return fd;
 }
 
@@ -115,6 +122,13 @@ int ttopensockunix(const char *path){
     close(fd);
     return -1;
   }
+  struct timeval opttv;
+  opttv.tv_sec = (int)SOCKRCVTIMEO;
+  opttv.tv_usec = (SOCKRCVTIMEO - (int)SOCKRCVTIMEO) * 1000000;
+  setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, (char *)&opttv, sizeof(opttv));
+  opttv.tv_sec = (int)SOCKSNDTIMEO;
+  opttv.tv_usec = (SOCKSNDTIMEO - (int)SOCKSNDTIMEO) * 1000000;
+  setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, (char *)&opttv, sizeof(opttv));
   return fd;
 }
 
@@ -566,25 +580,31 @@ int tthttpfetch(const char *url, TCMAP *reqheads, TCMAP *resheads, TCXSTR *resbo
         tcxstrprintf(obuf, "Authorization: Basic %s\r\n", enc);
         tcfree(enc);
       }
+      double tout = -1;
       if(reqheads){
         tcmapiterinit(reqheads);
         const char *name;
         while((name = tcmapiternext2(reqheads)) != NULL){
           if(strchr(name, ':') || !tcstricmp(name, "connection")) continue;
-          char *cap = tcstrdup(name);
-          tcstrtolower(cap);
-          char *wp = cap;
-          bool head = true;
-          while(*wp != '\0'){
-            if(head && *wp >= 'a' && *wp <= 'z') *wp -= 'a' - 'A';
-            head = *wp == '-' || *wp == ' ';
-            wp++;
+          if(!tcstricmp(name, "x-tt-timeout")){
+            tout = tcatof(tcmapget2(reqheads, name));
+          } else {
+            char *cap = tcstrdup(name);
+            tcstrtolower(cap);
+            char *wp = cap;
+            bool head = true;
+            while(*wp != '\0'){
+              if(head && *wp >= 'a' && *wp <= 'z') *wp -= 'a' - 'A';
+              head = *wp == '-' || *wp == ' ';
+              wp++;
+            }
+            tcxstrprintf(obuf, "%s: %s\r\n", cap, tcmapget2(reqheads, name));
+            tcfree(cap);
           }
-          tcxstrprintf(obuf, "%s: %s\r\n", cap, tcmapget2(reqheads, name));
-          tcfree(cap);
         }
       }
       tcxstrprintf(obuf, "\r\n", host);
+      if(tout > 0) ttsocksetlife(sock, tout);
       if(ttsocksend(sock, tcxstrptr(obuf), tcxstrsize(obuf))){
         char line[SOCKLINEBUFSIZ];
         if(ttsockgets(sock, line, SOCKLINEBUFSIZ) && tcstrfwm(line, "HTTP/")){

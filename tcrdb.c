@@ -1391,12 +1391,14 @@ void tcrdbqrysetorder(RDBQRY *qry, const char *name, int type){
 }
 
 
-/* Set the maximum number of records of the result of a query object. */
-void tcrdbqrysetmax(RDBQRY *qry, int max){
+/* Set the limit number of records of the result of a query object. */
+void tcrdbqrysetlimit(RDBQRY *qry, int max, int skip){
   TCXSTR *xstr = tcxstrnew();
-  tcxstrcat2(xstr, "setmax");
+  tcxstrcat2(xstr, "setlimit");
   tcxstrcat(xstr, "\0", 1);
   tcxstrprintf(xstr, "%d", max);
+  tcxstrcat(xstr, "\0", 1);
+  tcxstrprintf(xstr, "%d", skip);
   tclistpush(qry->args, tcxstrptr(xstr), tcxstrsize(xstr));
   tcxstrdel(xstr);
 }

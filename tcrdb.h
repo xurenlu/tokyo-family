@@ -629,10 +629,13 @@ void tcrdbqryaddcond(RDBQRY *qry, const char *name, int op, const char *expr);
 void tcrdbqrysetorder(RDBQRY *qry, const char *name, int type);
 
 
-/* Set the maximum number of records of the result of a query object.
+/* Set the limit number of records of the result of a query object.
    `qry' specifies the query object.
-   `max' specifies the maximum number of records of the result. */
-void tcrdbqrysetmax(RDBQRY *qry, int max);
+   `max' specifies the maximum number of records of the result.  If it is negative, no limit is
+   specified.
+   `skip' specifies the number of skipped records of the result.  If it is not more than 0, no
+   record is skipped. */
+void tcrdbqrysetlimit(RDBQRY *qry, int max, int skip);
 
 
 /* Execute the search of a query object.

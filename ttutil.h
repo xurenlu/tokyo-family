@@ -225,13 +225,13 @@ int ttsockcheckpfsiz(TTSOCK *sock);
 
 /* Fetch the resource of a URL by HTTP.
    `url' specifies the URL.
-   `reqheads' specifies a map object contains request header names and their values.  If it is
-   NULL, it is not used.
+   `reqheads' specifies a map object contains request header names and their values.  The header
+   "X-TT-Timeout" specifies the timeout in seconds.  If it is `NULL', it is not used.
    `resheads' specifies a map object to store response headers their values.  If it is NULL, it
    is not used.  Each key of the map is an uncapitalized header name.  The key "STATUS" means the
    status line.
    `resbody' specifies a extensible string object to store the entity body of the result.  If it
-   is NULL, it is not used.
+   is `NULL', it is not used.
    The return value is the response code or -1 on network error. */
 int tthttpfetch(const char *url, TCMAP *reqheads, TCMAP *resheads, TCXSTR *resbody);
 
@@ -419,8 +419,8 @@ bool ttserviskilled(TTSERV *serv);
  *************************************************************************************************/
 
 
-#define _TT_VERSION    "1.1.16"
-#define _TT_LIBVER     207
+#define _TT_VERSION    "1.1.17"
+#define _TT_LIBVER     301
 #define _TT_PROTVER    "0.9"
 
 
@@ -432,6 +432,11 @@ bool ttdaemonize(void);
 /* Get the load average of the system.
    The return value is the load average of the system. */
 double ttgetloadavg(void);
+
+
+/* tricks for backward compatibility */
+#define tcrdbqrysetmax(TC_tdb, TC_max) \
+  tcrdbqrysetlimit((TC_tdb), (TC_max), 0)
 
 
 
