@@ -26,7 +26,7 @@
 #if defined(TTNOEXT)
 
 
-typedef struct {                         // type of structure of logging opaque object
+typedef struct {                         // type of structure of the script extension
   int thnum;                             // number of native threads
   int thid;                              // thread ID
   char *path;                            // path of the initializing script
@@ -37,13 +37,14 @@ typedef struct {                         // type of structure of logging opaque 
   pthread_mutex_t *lcks;                 // mutex for user locks
   int lcknum;                            // number of user locks
   void (*logger)(int, const char *, void *);  // logging function
+  void *logopq;                          // opaque pointer for the logging function
 } SCREXT;
 
 
 /* Initialize the global scripting language extension. */
 void *scrextnew(int thnum, int thid, const char *path, TCADB *adb, TCULOG *ulog,
                 uint32_t sid, TCMDB *stash, pthread_mutex_t *lcks, int lcknum,
-                void (*logger)(int, const char *, void *)){
+                void (*logger)(int, const char *, void *), void *logopq){
   SCREXT *scr = tcmalloc(sizeof(*scr));
   scr->thnum = thnum;
   scr->thid = thid;
@@ -55,6 +56,7 @@ void *scrextnew(int thnum, int thid, const char *path, TCADB *adb, TCULOG *ulog,
   scr->lcks = lcks;
   scr->lcknum = lcknum;
   scr->logger = logger;
+  scr->logopq = logopq;
   return scr;
 }
 
@@ -99,7 +101,7 @@ char *scrextcallmethod(void *scr, const char *name,
     return tcadbget(myscr->adb, kbuf, ksiz, sp);
   } else if(!strcmp(name, "log")){
     char *msg = tcmemdup(kbuf, ksiz);
-    myscr->logger(TTLOGINFO, msg, NULL);
+    myscr->logger(TTLOGINFO, msg, myscr->logopq);
     tcfree(msg);
     msg = tcstrdup("ok");
     *sp = strlen(msg);
@@ -144,7 +146,7 @@ char *scrextcallmethod(void *scr, const char *name,
 #define SERVVAR      "_serv_"            // global variable name for server resources
 #define ITERVAR      "_iter_"            // global variable name for iterator
 
-typedef struct {                         // type of structure of logging opaque object
+typedef struct {                         // type of structure of the script extension
   int thnum;                             // number of native threads
   int thid;                              // thread ID
   lua_State *lua;                        // Lua environment
@@ -158,6 +160,7 @@ typedef struct {                         // type of structure of the server data
   pthread_mutex_t *lcks;                 // mutex for user locks
   int lcknum;                            // number of user locks
   void (*logger)(int, const char *, void *);  // logging function
+  void *logopq;                          // opaque pointer for the logging function
 } SERV;
 
 
@@ -207,7 +210,7 @@ static int serv_mkdir(lua_State *lua);
 /* Initialize the global scripting language extension. */
 void *scrextnew(int thnum, int thid, const char *path, TCADB *adb, TCULOG *ulog,
                 uint32_t sid, TCMDB *stash, pthread_mutex_t *lcks, int lcknum,
-                void (*logger)(int, const char *, void *)){
+                void (*logger)(int, const char *, void *), void *logopq){
   int isiz;
   char *ibuf = tcreadfile(path, 0, &isiz);
   if(!ibuf) return NULL;
@@ -226,6 +229,7 @@ void *scrextnew(int thnum, int thid, const char *path, TCADB *adb, TCULOG *ulog,
   serv->lcks = lcks;
   serv->lcknum = lcknum;
   serv->logger = logger;
+  serv->logopq = logopq;
   lua_setglobal(lua, SERVVAR);
   lua_register(lua, "_log", serv_log);
   lua_register(lua, "_put", serv_put);
@@ -342,7 +346,7 @@ static void reporterror(lua_State *lua){
   char *msg = tcsprintf("Lua error: %s", argc > 0 ? lua_tostring(lua, argc) : "unknown");
   lua_getglobal(lua, SERVVAR);
   SERV *serv = lua_touserdata(lua, -1);
-  serv->logger(TTLOGERROR, msg, NULL);
+  serv->logger(TTLOGERROR, msg, serv->logopq);
   tcfree(msg);
 }
 
@@ -385,7 +389,7 @@ static int serv_log(lua_State *lua){
   if(argc > 1) level = lua_tointeger(lua, 2);
   lua_getglobal(lua, SERVVAR);
   SERV *serv = lua_touserdata(lua, -1);
-  serv->logger(level, msg, NULL);
+  serv->logger(level, msg, serv->logopq);
   return 0;
 }
 

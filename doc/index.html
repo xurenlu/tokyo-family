@@ -828,7 +828,7 @@ var {
 <dd>Because an additional zero code is appended at the end of the region of the return value, the return value can be treated as a character string.  Because the region of the return value is allocated with the `malloc' call, it should be released with the `free' call when it is no longer in use.</dd>
 </dl>
 
-<p>The function `tcrdbext2' is used in order to call a function of the script language extension.</p>
+<p>The function `tcrdbext2' is used in order to call a function of the script language extension with string parameters.</p>
 
 <dl class="api">
 <dt><code>char *tcrdbext2(TCRDB *<var>rdb</var>, const char *<var>name</var>, int <var>opts</var>, const char *<var>kstr</var>, const char *<var>vstr</var>);</code></dt>

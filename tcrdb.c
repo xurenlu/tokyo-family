@@ -856,7 +856,7 @@ void *tcrdbext(TCRDB *rdb, const char *name, int opts,
 }
 
 
-/* Call a function of the scripting language extension. */
+/* Call a function of the scripting language extension with string parameters. */
 char *tcrdbext2(TCRDB *rdb, const char *name, int opts, const char *kstr, const char *vstr){
   assert(rdb && name && kstr && vstr);
   int vsiz;

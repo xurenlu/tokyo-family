@@ -379,7 +379,7 @@ void *tcrdbext(TCRDB *rdb, const char *name, int opts,
                const void *kbuf, int ksiz, const void *vbuf, int vsiz, int *sp);
 
 
-/* Call a function of the scripting language extension.
+/* Call a function of the scripting language extension with string parameters.
    `rdb' specifies the remote database object.
    `name' specifies the function name.
    `opts' specifies options by bitwise-or: `RDBXOLCKREC' for record locking, `RDBXOLCKGLB' for

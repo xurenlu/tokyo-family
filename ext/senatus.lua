@@ -390,6 +390,17 @@ function mkdir(key, value)
 end
 
 
+-- log a string
+function log(key, value)
+   local level = tonumber(value)
+   if not level then
+      level = 1
+   end
+   _log(key, level)
+   return "ok"
+end
+
+
 -- print a string
 function hello()
    print("hello: " .. _time())

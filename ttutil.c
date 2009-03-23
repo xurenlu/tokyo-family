@@ -105,6 +105,8 @@ int ttopensock(const char *addr, int port){
   opttv.tv_sec = (int)SOCKSNDTIMEO;
   opttv.tv_usec = (SOCKSNDTIMEO - (int)SOCKSNDTIMEO) * 1000000;
   setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, (char *)&opttv, sizeof(opttv));
+  int optint = 1;
+  setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, (char *)&optint, sizeof(optint));
   return fd;
 }
 
@@ -196,6 +198,8 @@ int ttacceptsock(int fd, char *addr, int *pp){
       opttv.tv_sec = (int)SOCKSNDTIMEO;
       opttv.tv_usec = (SOCKSNDTIMEO - (int)SOCKSNDTIMEO) * 1000000;
       setsockopt(cfd, SOL_SOCKET, SO_SNDTIMEO, (char *)&opttv, sizeof(opttv));
+      int optint = 1;
+      setsockopt(cfd, IPPROTO_TCP, TCP_NODELAY, (char *)&optint, sizeof(optint));
       if(addr){
         if(getnameinfo((struct sockaddr *)&sain, sizeof(sain), addr, TTADDRBUFSIZ,
                        NULL, 0, NI_NUMERICHOST) != 0) sprintf(addr, "0.0.0.0");

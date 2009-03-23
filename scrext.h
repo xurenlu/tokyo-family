@@ -54,10 +54,11 @@
    `lcks' specifies the mutex objects for user locks.
    `lcknum' specifies the number of user locks.
    `logger' specifies the pointer to a function to do with a log message.
+   `logopq' specifies the opaque pointer for the logging function.
    The return value is the scripting object or `NULL' on failure. */
 void *scrextnew(int thnum, int thid, const char *path, TCADB *adb, TCULOG *ulog,
                 uint32_t sid, TCMDB *stash, pthread_mutex_t *lcks, int lcknum,
-                void (*logger)(int, const char *, void *));
+                void (*logger)(int, const char *, void *), void *logopq);
 
 
 /* Destroy the scripting language extension.
