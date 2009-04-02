@@ -1,5 +1,17 @@
 2009-03-14  Mikio Hirabayashi  <mikio@users.sourceforge.net>
 
+	* tcrdb.c (tcrdbqrysearchget): the option for no update log was added.
+
+	* tcrdb.c (tcrdbqrysearchcount): new function.
+
+	* tculog.c (tcreplread): timeout mechanism was added.
+
+	* ttserver.c (do_repl): performance was improved.
+
+	- Release: 1.1.19
+
+2009-03-14  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
 	* ttservctl: configuration was modified and update log is now disabled by default.
 
 	* ttutil.c (ttopensock, ttacceptsock): performance was improved.

@@ -91,7 +91,6 @@ pre {
   padding: 0.2em;
   background-color: #ddddee;
   border: 1px solid #bbbbcc;
-  border-radius: 4px;
   font-size: 95%;
 }
 li,dt,dd {
@@ -1079,6 +1078,14 @@ var {
 <dd>`<var>index</var>' the index of a element of the search result.</dd>
 <dd>The return value is a map object containing columns.</dd>
 <dd>Because the object of the return value is created with the function `tcmapnew', it should be deleted with the function `tcmapdel' when it is no longer in use.</dd>
+</dl>
+
+<p>The function `tcrdbqrysearchcount' is used in order to get the count of corresponding records of a query object.</p>
+
+<dl class="api">
+<dt><code>int tcrdbqrysearchcount(RDBQRY *<var>qry</var>);</code></dt>
+<dd>`<var>qry</var>' specifies the query object.</dd>
+<dd>The return value is the count of corresponding records or 0 on failure.</dd>
 </dl>
 
 <h3 id="tcrdbapi_example">Example Code</h3>
@@ -2072,6 +2079,8 @@ cp -f "$srcpath" "$destpath"
 
 <p>If huge number of clients access the server, make sure the limit number of file descriptors per process is cleared.  By default on most systems, it is set as 1024.  If so, use `<code>ulimit</code>' to clear it.</p>
 
+<p>In order to deal with rushing queries at the peak time of your service, replication combining the on-memory hash/tree database and the file hash/tree database is useful.  The master server handles the on-memory database and it can come through rushing queries at the peak time.  Though the on-memory database can not assure the data persistence, the slave of replication compensates the shortage by storing records in the file database.</p>
+
 <h3 id="tutorial_luaext">Lua Extension</h3>
 
 <p>If you want more complex database operations than existing ones, use the Lua extension.  For example, prepare the following script and save it as "test.lua".  There is a function "fibonacci" which returns the Fibonacci number of a number of the key.</p>
@@ -2188,7 +2197,7 @@ if($res-&gt;is_success()){
 
 <h3 id="tutorial_expcache">Persistent but Expirable Cache</h3>
 
-<p>If you want to cache data like session information for your Web application but want to avoid data loss because of the server crash, using Tokyo Tyrant can be the solution, that is to say, "persistent" expirable cache.  It requires the following preconditions.</p>
+<p>If you want to cache data like session information for your Web application but want to avoid data loss because of the server crash, using Tokyo Tyrant can be the solution, that is to say, "persistent" but expirable cache.  It requires the following preconditions.</p>
 
 <ul>
 <li>The server must open a table database.</li>
@@ -2206,7 +2215,7 @@ if($res-&gt;is_success()){
    table.insert(args, "out")
    local res = _misc("search", args)
    if not res then
-      _log("expiration was failed")
+      _log("expiration was failed", 2)
    end
 end
 </pre>
