@@ -19,6 +19,7 @@
 #include "myconf.h"
 
 #define TCULAIOCBNUM   64                // number of AIO tasks
+#define TCREPLTIMEO    5.0               // timeout of the replication socket
 
 
 /* private function prototypes */
@@ -69,8 +70,8 @@ void tculogdel(TCULOG *ulog){
 
 /* Set AIO control of an update log object. */
 bool tculogsetaio(TCULOG *ulog){
-  assert(ulog);
 #if defined(_SYS_LINUX_)
+  assert(ulog);
   if(ulog->base || ulog->aiocbs) return false;
   struct aiocb *aiocbs = tcmalloc(sizeof(*aiocbs) * TCULAIOCBNUM);
   for(int i = 0; i < TCULAIOCBNUM; i++){
@@ -79,6 +80,7 @@ bool tculogsetaio(TCULOG *ulog){
   ulog->aiocbs = aiocbs;
   return true;
 #else
+  assert(ulog);
   return true;
 #endif
 }
@@ -965,6 +967,7 @@ const char *tcreplread(TCREPL *repl, int *sp, uint64_t *tsp, uint32_t *sidp){
   assert(repl && sp && tsp);
   int ocs = PTHREAD_CANCEL_DISABLE;
   pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, &ocs);
+  ttsocksetlife(repl->sock, TCREPLTIMEO);
   int c = ttsockgetc(repl->sock);
   if(c == TCULMAGICNOP){
     *sp = 0;

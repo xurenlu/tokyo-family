@@ -2015,6 +2015,7 @@ static void do_repl(TTSOCK *sock, TASKARG *arg, TTREQ *req){
   if(ulrd){
     pthread_cleanup_push((void (*)(void *))tculrddel, ulrd);
     bool err = false;
+    bool idle = true;
     const char *rbuf;
     int rsiz;
     uint64_t rts;
@@ -2023,13 +2024,17 @@ static void do_repl(TTSOCK *sock, TASKARG *arg, TTREQ *req){
     while(!err && !ttserviskilled(g_serv)){
       ttsocksetlife(sock, UINT_MAX);
       req->mtime = tctime() + UINT_MAX;
-      *(unsigned char *)stack = TCULMAGICNOP;
-      if(!ttsocksend(sock, stack, sizeof(uint8_t))){
-        err = true;
-        ttservlog(g_serv, TTLOGINFO, "do_repl: connection closed");
+      if(idle){
+        *(unsigned char *)stack = TCULMAGICNOP;
+        if(!ttsocksend(sock, stack, sizeof(uint8_t))){
+          err = true;
+          ttservlog(g_serv, TTLOGINFO, "do_repl: connection closed");
+        }
       }
       tculrdwait(ulrd);
+      idle = true;
       while(!err && (rbuf = tculrdread(ulrd, &rsiz, &rts, &rsid)) != NULL){
+        idle = false;
         if(rsid == sid) continue;
         int msiz = sizeof(uint8_t) + sizeof(uint64_t) + sizeof(uint32_t) * 2 + rsiz;
         char *mbuf = (msiz < TTIOBUFSIZ) ? stack : tcmalloc(msiz);

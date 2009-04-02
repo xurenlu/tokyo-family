@@ -348,7 +348,7 @@ end
 
 
 -- get status of a file
-function stat(key, value)
+function statfile(key, value)
    local stat = _stat(key)
    if not stat then
       return nil
@@ -415,7 +415,7 @@ function expire()
    table.insert(args, "out")
    local res = _misc("search", args)
    if not res then
-      _log("expiration was failed")
+      _log("expiration was failed", 2)
    end
 end
 
@@ -428,7 +428,7 @@ function expire2()
    table.insert(args, "out")
    local res = _misc("search", args)
    if not res then
-      _log("expiration was failed")
+      _log("expiration was failed", 2)
    end
 end
 
