@@ -671,12 +671,6 @@ TCLIST *tcrdbqrysearchget(RDBQRY *qry);
 TCMAP *tcrdbqryrescols(TCLIST *res, int index);
 
 
-/* Get the count of corresponding records of a query object.
-   `qry' specifies the query object.
-   The return value is the count of corresponding records or 0 on failure. */
-int tcrdbqrysearchcount(RDBQRY *qry);
-
-
 
 __TCRDB_CLINKAGEEND
 #endif                                   /* duplication check */

@@ -27,7 +27,6 @@
 #define SOCKPATHBUFSIZ 108               // size of a socket path buffer
 #define SOCKRCVTIMEO   0.25              // timeout of the recv call of socket
 #define SOCKSNDTIMEO   0.25              // timeout of the send call of socket
-#define SOCKCNCTTIMEO  5.0               // timeout of the connect call of socket
 #define SOCKLINEBUFSIZ 4096              // size of a line buffer of socket
 #define SOCKLINEMAXSIZ (16*1024*1024)    // maximum size of a line of socket
 #define HTTPBODYMAXSIZ (256*1024*1024)   // maximum size of the entity body of HTTP
@@ -95,8 +94,10 @@ int ttopensock(const char *addr, int port){
   sain.sin_port = htons(snum);
   int fd = socket(PF_INET, SOCK_STREAM, 0);
   if(fd == -1) return -1;
-  int optint = 1;
-  setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, (char *)&optint, sizeof(optint));
+  if(connect(fd, (struct sockaddr *)&sain, sizeof(sain)) != 0){
+    close(fd);
+    return -1;
+  }
   struct timeval opttv;
   opttv.tv_sec = (int)SOCKRCVTIMEO;
   opttv.tv_usec = (SOCKRCVTIMEO - (int)SOCKRCVTIMEO) * 1000000;
@@ -104,20 +105,9 @@ int ttopensock(const char *addr, int port){
   opttv.tv_sec = (int)SOCKSNDTIMEO;
   opttv.tv_usec = (SOCKSNDTIMEO - (int)SOCKSNDTIMEO) * 1000000;
   setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, (char *)&opttv, sizeof(opttv));
-  optint = 1;
+  int optint = 1;
   setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, (char *)&optint, sizeof(optint));
-  double dl = tctime() + SOCKCNCTTIMEO;
-  do {
-    int ocs = PTHREAD_CANCEL_DISABLE;
-    pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, &ocs);
-    int rv = connect(fd, (struct sockaddr *)&sain, sizeof(sain));
-    pthread_setcancelstate(ocs, NULL);
-    if(rv == 0) return fd;
-    if(errno != EINTR && errno != EAGAIN && errno != EINPROGRESS && errno != EALREADY &&
-       errno != ETIMEDOUT) break;
-  } while(tctime() <= dl);
-  close(fd);
-  return -1;
+  return fd;
 }
 
 
@@ -130,8 +120,10 @@ int ttopensockunix(const char *path){
   snprintf(saun.sun_path, SOCKPATHBUFSIZ, "%s", path);
   int fd = socket(PF_UNIX, SOCK_STREAM, 0);
   if(fd == -1) return -1;
-  int optint = 1;
-  setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, (char *)&optint, sizeof(optint));
+  if(connect(fd, (struct sockaddr *)&saun, sizeof(saun)) != 0){
+    close(fd);
+    return -1;
+  }
   struct timeval opttv;
   opttv.tv_sec = (int)SOCKRCVTIMEO;
   opttv.tv_usec = (SOCKRCVTIMEO - (int)SOCKRCVTIMEO) * 1000000;
@@ -139,18 +131,7 @@ int ttopensockunix(const char *path){
   opttv.tv_sec = (int)SOCKSNDTIMEO;
   opttv.tv_usec = (SOCKSNDTIMEO - (int)SOCKSNDTIMEO) * 1000000;
   setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, (char *)&opttv, sizeof(opttv));
-  double dl = tctime() + SOCKCNCTTIMEO;
-  do {
-    int ocs = PTHREAD_CANCEL_DISABLE;
-    pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, &ocs);
-    int rv = connect(fd, (struct sockaddr *)&saun, sizeof(saun));
-    pthread_setcancelstate(ocs, NULL);
-    if(rv == 0) return fd;
-    if(errno != EINTR && errno != EAGAIN && errno != EINPROGRESS && errno != EALREADY &&
-       errno != ETIMEDOUT) break;
-  } while(tctime() <= dl);
-  close(fd);
-  return -1;
+  return fd;
 }
 
 
@@ -165,8 +146,8 @@ int ttopenservsock(const char *addr, int port){
   sain.sin_port = htons(snum);
   int fd = socket(PF_INET, SOCK_STREAM, 0);
   if(fd == -1) return -1;
-  int optint = 1;
-  if(setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, (char *)&optint, sizeof(optint)) != 0){
+  int optone = 1;
+  if(setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, (char *)&optone, sizeof(optone)) != 0){
     close(fd);
     return -1;
   }
@@ -208,8 +189,8 @@ int ttacceptsock(int fd, char *addr, int *pp){
     socklen_t slen = sizeof(sain);
     int cfd = accept(fd, (struct sockaddr *)&sain, &slen);
     if(cfd >= 0){
-      int optint = 1;
-      setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, (char *)&optint, sizeof(optint));
+      int optone = 1;
+      setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, (char *)&optone, sizeof(optone));
       struct timeval opttv;
       opttv.tv_sec = (int)SOCKRCVTIMEO;
       opttv.tv_usec = (SOCKRCVTIMEO - (int)SOCKRCVTIMEO) * 1000000;
@@ -217,7 +198,7 @@ int ttacceptsock(int fd, char *addr, int *pp){
       opttv.tv_sec = (int)SOCKSNDTIMEO;
       opttv.tv_usec = (SOCKSNDTIMEO - (int)SOCKSNDTIMEO) * 1000000;
       setsockopt(cfd, SOL_SOCKET, SO_SNDTIMEO, (char *)&opttv, sizeof(opttv));
-      optint = 1;
+      int optint = 1;
       setsockopt(cfd, IPPROTO_TCP, TCP_NODELAY, (char *)&optint, sizeof(optint));
       if(addr){
         if(getnameinfo((struct sockaddr *)&sain, sizeof(sain), addr, TTADDRBUFSIZ,
@@ -237,8 +218,8 @@ int ttacceptsockunix(int fd){
   do {
     int cfd = accept(fd, NULL, NULL);
     if(cfd >= 0){
-      int optint = 1;
-      setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, (char *)&optint, sizeof(optint));
+      int optone = 1;
+      setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, (char *)&optone, sizeof(optone));
       struct timeval opttv;
       opttv.tv_sec = (int)SOCKRCVTIMEO;
       opttv.tv_usec = (SOCKRCVTIMEO - (int)SOCKRCVTIMEO) * 1000000;

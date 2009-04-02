@@ -1431,7 +1431,7 @@ TCLIST *tcrdbqrysearchget(RDBQRY *qry){
   assert(qry);
   TCLIST *args = tclistdup(qry->args);
   tclistpush2(args, "get");
-  TCLIST *rv = tcrdbmisc(qry->rdb, "search", RDBMONOULOG, args);
+  TCLIST *rv = tcrdbmisc(qry->rdb, "search", 0, args);
   tclistdel(args);
   return rv;
 }
@@ -1444,20 +1444,6 @@ TCMAP *tcrdbqryrescols(TCLIST *res, int index){
   int csiz;
   const char *cbuf = tclistval(res, index, &csiz);
   return tcstrsplit4(cbuf, csiz);
-}
-
-
-/* Get the count of corresponding records of a query object. */
-int tcrdbqrysearchcount(RDBQRY *qry){
-  assert(qry);
-  TCLIST *args = tclistdup(qry->args);
-  tclistpush2(args, "count");
-  TCLIST *rv = tcrdbmisc(qry->rdb, "search", RDBMONOULOG, args);
-  tclistdel(args);
-  if(!rv) return 0;
-  int count = tclistnum(rv) > 0 ? tcatoi(tclistval2(rv, 0)) : 0;
-  tclistdel(rv);
-  return count;
 }
 
 

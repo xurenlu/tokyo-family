@@ -1341,10 +1341,6 @@ static int proctable(const char *host, int port, int cnum, int rnum){
     }
     tcmapdel(cols);
   }
-  if(tclistnum(res) != tcrdbqrysearchcount(qry)){
-    eprint(rdb, "(validation)");
-    err = true;
-  }
   tclistdel(res);
   tcrdbqrydel(qry);
   qry = tcrdbqrynew(rdb);
