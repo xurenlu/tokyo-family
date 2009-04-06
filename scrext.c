@@ -145,6 +145,9 @@ char *scrextcallmethod(void *scr, const char *name,
 
 #define SERVVAR      "_serv_"            // global variable name for server resources
 #define ITERVAR      "_iter_"            // global variable name for iterator
+#define MRMAPVAR     "_mrmap_"           // global variable name for mapreduce mapper
+#define MRREDVAR     "_mrred_"           // global variable name for mapreduce reducer
+#define MRPOOLVAR    "_mrpool_"          // global variable name for mapreduce pool
 
 typedef struct {                         // type of structure of the script extension
   int thnum;                             // number of native threads
@@ -168,6 +171,7 @@ typedef struct {                         // type of structure of the server data
 static void reporterror(lua_State *lua);
 static int lockmtxidx(const char *kbuf, int ksiz, int lcknum);
 static bool iterrec(const void *kbuf, int ksiz, const void *vbuf, int vsiz, lua_State *lua);
+static int serv_putfunc(lua_State *lua);
 static int serv_log(lua_State *lua);
 static int serv_put(lua_State *lua);
 static int serv_putkeep(lua_State *lua);
@@ -184,7 +188,11 @@ static int serv_rnum(lua_State *lua);
 static int serv_size(lua_State *lua);
 static int serv_misc(lua_State *lua);
 static int serv_foreach(lua_State *lua);
+static int serv_mapreduce(lua_State *lua);
+static int serv_mapreducemapemit(lua_State *lua);
 static int serv_stashput(lua_State *lua);
+static int serv_stashputkeep(lua_State *lua);
+static int serv_stashputcat(lua_State *lua);
 static int serv_stashout(lua_State *lua);
 static int serv_stashget(lua_State *lua);
 static int serv_stashvanish(lua_State *lua);
@@ -211,8 +219,17 @@ static int serv_mkdir(lua_State *lua);
 void *scrextnew(int thnum, int thid, const char *path, TCADB *adb, TCULOG *ulog,
                 uint32_t sid, TCMDB *stash, pthread_mutex_t *lcks, int lcknum,
                 void (*logger)(int, const char *, void *), void *logopq){
+  char *ibuf;
   int isiz;
-  char *ibuf = tcreadfile(path, 0, &isiz);
+  if(*path == '@'){
+    ibuf = tcstrdup(path + 1);
+    isiz = strlen(ibuf);
+  } else if(*path != '\0'){
+    ibuf = tcreadfile(path, 0, &isiz);
+  } else {
+    ibuf = tcmemdup("", 0);
+    isiz = 0;
+  }
   if(!ibuf) return NULL;
   lua_State *lua = luaL_newstate();
   if(!lua){
@@ -231,6 +248,7 @@ void *scrextnew(int thnum, int thid, const char *path, TCADB *adb, TCULOG *ulog,
   serv->logger = logger;
   serv->logopq = logopq;
   lua_setglobal(lua, SERVVAR);
+  lua_register(lua, "putfunc", serv_putfunc);
   lua_register(lua, "_log", serv_log);
   lua_register(lua, "_put", serv_put);
   lua_register(lua, "_putkeep", serv_putkeep);
@@ -247,7 +265,10 @@ void *scrextnew(int thnum, int thid, const char *path, TCADB *adb, TCULOG *ulog,
   lua_register(lua, "_size", serv_size);
   lua_register(lua, "_misc", serv_misc);
   lua_register(lua, "_foreach", serv_foreach);
+  lua_register(lua, "_mapreduce", serv_mapreduce);
   lua_register(lua, "_stashput", serv_stashput);
+  lua_register(lua, "_stashputkeep", serv_stashputkeep);
+  lua_register(lua, "_stashputcat", serv_stashputcat);
   lua_register(lua, "_stashout", serv_stashout);
   lua_register(lua, "_stashget", serv_stashget);
   lua_register(lua, "_stashvanish", serv_stashvanish);
@@ -327,8 +348,38 @@ char *scrextcallmethod(void *scr, const char *name,
     return NULL;
   }
   if(lua_gettop(lua) < 1) return NULL;
+  const char *rbuf = NULL;
   size_t rsiz;
-  const char *rbuf = lua_tolstring(lua, 1, &rsiz);
+  switch(lua_type(lua, 1)){
+  case LUA_TNUMBER:
+  case LUA_TSTRING:
+    rbuf = lua_tolstring(lua, 1, &rsiz);
+    break;
+  case LUA_TBOOLEAN:
+    if(lua_toboolean(lua, 1)){
+      rbuf = "true";
+      rsiz = strlen(rbuf);
+    }
+    break;
+  case LUA_TTABLE:
+    if(lua_objlen(lua, 1) > 0){
+      lua_rawgeti(lua, 1, 1);
+      switch(lua_type(lua, -1)){
+      case LUA_TNUMBER:
+      case LUA_TSTRING:
+        rbuf = lua_tolstring(lua, -1, &rsiz);
+        break;
+      case LUA_TBOOLEAN:
+        if(lua_toboolean(lua, -1)){
+          rbuf = "true";
+          rsiz = strlen(rbuf);
+        }
+        break;
+      }
+      lua_pop(lua, 1);
+    }
+    break;
+  }
   if(!rbuf){
     lua_settop(lua, 0);
     return NULL;
@@ -367,9 +418,68 @@ static bool iterrec(const void *kbuf, int ksiz, const void *vbuf, int vsiz, lua_
   lua_getglobal(lua, ITERVAR);
   lua_pushlstring(lua, kbuf, ksiz);
   lua_pushlstring(lua, vbuf, vsiz);
-  bool rv = lua_pcall(lua, 2, 1, 0) == 0 ? lua_toboolean(lua, -1) : false;
+  bool err = false;
+  if(lua_pcall(lua, 2, 1, 0) == 0){
+    if(lua_gettop(lua) < 1 && !lua_toboolean(lua, 1)) err = true;
+  } else {
+    reporterror(lua);
+    err = true;
+  }
   lua_settop(lua, top);
-  return rv;
+  return !err;
+}
+
+
+/* call function to map records for mapreduce */
+static bool maprec(void *map, const void *kbuf, int ksiz, const void *vbuf, int vsiz,
+                   lua_State *lua){
+  lua_pushlightuserdata(lua, map);
+  lua_setglobal(lua, MRPOOLVAR);
+  int top = lua_gettop(lua);
+  lua_getglobal(lua, MRMAPVAR);
+  lua_pushlstring(lua, kbuf, ksiz);
+  lua_pushlstring(lua, vbuf, vsiz);
+  lua_pushcfunction(lua, serv_mapreducemapemit);
+  bool err = false;
+  if(lua_pcall(lua, 3, 1, 0) == 0){
+    if(lua_gettop(lua) < 1 && !lua_toboolean(lua, 1)) err = true;
+  } else {
+    reporterror(lua);
+    err = true;
+  }
+  lua_settop(lua, top);
+  return !err;
+}
+
+
+/* for putfunc function */
+static int serv_putfunc(lua_State *lua){
+  int argc = lua_gettop(lua);
+  if(argc != 2){
+    lua_pushstring(lua, "putfunc: invalid arguments");
+    lua_error(lua);
+  }
+  const char *name = lua_tostring(lua, 1);
+  const char *expr = lua_tostring(lua, 2);
+  if(!name || !expr){
+    lua_pushstring(lua, "putfunc: invalid arguments");
+    lua_error(lua);
+  }
+  lua_getglobal(lua, SERVVAR);
+  SERV *serv = lua_touserdata(lua, -1);
+  bool err = false;
+
+  printf("%s:%s\n", name, expr);
+
+
+
+  lua_settop(lua, 0);
+  if(err){
+    lua_pushnil(lua);
+  } else {
+    lua_pushstring(lua, "ok");
+  }
+  return 1;
 }
 
 
@@ -390,6 +500,7 @@ static int serv_log(lua_State *lua){
   lua_getglobal(lua, SERVVAR);
   SERV *serv = lua_touserdata(lua, -1);
   serv->logger(level, msg, serv->logopq);
+  lua_settop(lua, 0);
   return 0;
 }
 
@@ -760,13 +871,161 @@ static int serv_foreach(lua_State *lua){
   SERV *serv = lua_touserdata(lua, -1);
   lua_pushvalue(lua, 1);
   lua_setglobal(lua, ITERVAR);
-  if(tcadbforeach(serv->adb, (TCITER)iterrec, lua)){
-    lua_pushboolean(lua, true);
-  } else {
-    lua_pushboolean(lua, false);
-  }
+  bool err = false;
+  if(!tcadbforeach(serv->adb, (TCITER)iterrec, lua)) err = true;
   lua_pushnil(lua);
   lua_setglobal(lua, ITERVAR);
+  lua_settop(lua, 0);
+  lua_pushboolean(lua, !err);
+  return 1;
+}
+
+
+/* for _mapreduce function */
+static int serv_mapreduce(lua_State *lua){
+  int argc = lua_gettop(lua);
+  if(argc < 1){
+    lua_pushstring(lua, "_mapreduce: invalid arguments");
+    lua_error(lua);
+  }
+  int id = lua_tonumber(lua, 1);
+  if(id < 1){
+    lua_pushstring(lua, "_mapreduce: invalid arguments");
+    lua_error(lua);
+  }
+  lua_getglobal(lua, SERVVAR);
+  SERV *serv = lua_touserdata(lua, -1);
+  TCLIST *keys = NULL;
+  if(argc > 1){
+    const char *kbuf;
+    size_t ksiz;
+    int len;
+    switch(lua_type(lua, 2)){
+    case LUA_TNUMBER:
+    case LUA_TSTRING:
+      keys = tclistnew2(1);
+      kbuf = lua_tolstring(lua, 2, &ksiz);
+      tclistpush(keys, kbuf, ksiz);
+      break;
+    case LUA_TTABLE:
+      len = lua_objlen(lua, 2);
+      keys = tclistnew2(len);
+      for(int i = 1; i <= len; i++){
+        lua_rawgeti(lua, 2, i);
+        switch(lua_type(lua, -1)){
+        case LUA_TNUMBER:
+        case LUA_TSTRING:
+          kbuf = lua_tolstring(lua, -1, &ksiz);
+          tclistpush(keys, kbuf, ksiz);
+          break;
+        }
+        lua_pop(lua, 1);
+      }
+      break;
+    }
+  }
+  if(argc > 2 && lua_isfunction(lua, 3)){
+    lua_pushvalue(lua, 3);
+  } else {
+    lua_pushnil(lua);
+  }
+  lua_setglobal(lua, MRMAPVAR);
+  if(argc > 3 && lua_isfunction(lua, 4)){
+    lua_pushvalue(lua, 4);
+  } else {
+    lua_pushnil(lua);
+  }
+  lua_setglobal(lua, MRREDVAR);
+  bool err = false;
+  TCBDB *bdb = tcbdbnew();
+  lua_getglobal(lua, "_tmpdir_");
+  const char *tmpdir = lua_tostring(lua, -1);
+  if(!tmpdir) tmpdir = "/tmp";
+  char *path = tcsprintf("%s%c%s-%d-%d", tmpdir, MYPATHCHR, "mapbdb", getpid(), id);
+  unlink(path);
+  if(!tcbdbopen(bdb, path, BDBOWRITER | BDBOCREAT | BDBOTRUNC)) err = true;
+  unlink(path);
+  tcfree(path);
+  if(!tcadbmapbdb(serv->adb, keys, bdb, (ADBMAPPROC)maprec, lua, -1)) err = true;
+  if(!err){
+    BDBCUR *cur = tcbdbcurnew(bdb);
+    tcbdbcurfirst(cur);
+    const char *lbuf = NULL;
+    int lsiz = 0;
+    int lnum = 0;
+    const char *kbuf;
+    int ksiz;
+    while(!err && (kbuf = tcbdbcurkey3(cur, &ksiz)) != NULL){
+      int vsiz;
+      const char *vbuf = tcbdbcurval3(cur, &vsiz);
+      if(lbuf && lsiz == ksiz && !memcmp(lbuf, kbuf, lsiz)){
+        lua_pushlstring(lua, vbuf, vsiz);
+        lua_rawseti(lua, -2, ++lnum);
+      } else {
+        if(lbuf){
+          if(lua_pcall(lua, 2, 1, 0) != 0){
+            reporterror(lua);
+            err = true;
+          } else if(lua_gettop(lua) < 1 || !lua_toboolean(lua, 1)){
+            err = true;
+          }
+          lua_settop(lua, 0);
+        }
+        lua_getglobal(lua, MRREDVAR);
+        lua_pushlstring(lua, kbuf, ksiz);
+        lua_newtable(lua);
+        lnum = 1;
+        lua_pushlstring(lua, vbuf, vsiz);
+        lua_rawseti(lua, -2, lnum);
+      }
+      lbuf = kbuf;
+      lsiz = ksiz;
+      tcbdbcurnext(cur);
+    }
+    if(lbuf){
+      if(lua_pcall(lua, 2, 1, 0) != 0){
+        reporterror(lua);
+        err = true;
+      } else if(lua_gettop(lua) < 1 || !lua_toboolean(lua, 1)){
+        err = true;
+      }
+      lua_settop(lua, 0);
+    }
+    tcbdbcurdel(cur);
+  }
+  if(!tcbdbclose(bdb)) err = true;
+  tcbdbdel(bdb);
+  if(keys) tclistdel(keys);
+  lua_pushnil(lua);
+  lua_setglobal(lua, MRREDVAR);
+  lua_pushnil(lua);
+  lua_setglobal(lua, MRMAPVAR);
+  lua_settop(lua, 0);
+  lua_pushboolean(lua, !err);
+  return 1;
+}
+
+
+/* for _mapreduce function */
+static int serv_mapreducemapemit(lua_State *lua){
+  int argc = lua_gettop(lua);
+  if(argc != 2){
+    lua_pushstring(lua, "_mapreducemapemit: invalid arguments");
+    lua_error(lua);
+  }
+  size_t ksiz;
+  const char *kbuf = lua_tolstring(lua, 1, &ksiz);
+  size_t vsiz;
+  const char *vbuf = lua_tolstring(lua, 2, &vsiz);
+  if(!kbuf || !vbuf){
+    lua_pushstring(lua, "_mapreducemapemit: invalid arguments");
+    lua_error(lua);
+  }
+  lua_getglobal(lua, MRPOOLVAR);
+  void *map = lua_touserdata(lua, -1);
+  bool rv = tcadbmapbdbemit(map, kbuf, ksiz, vbuf, vsiz);
+  lua_settop(lua, 0);
+  lua_pushboolean(lua, rv);
   return 1;
 }
 
@@ -789,6 +1048,52 @@ static int serv_stashput(lua_State *lua){
   lua_getglobal(lua, SERVVAR);
   SERV *serv = lua_touserdata(lua, -1);
   tcmdbput(serv->stash, kbuf, ksiz, vbuf, vsiz);
+  lua_pushboolean(lua, true);
+  return 1;
+}
+
+
+/* for _stashputkeep function */
+static int serv_stashputkeep(lua_State *lua){
+  int argc = lua_gettop(lua);
+  if(argc != 2){
+    lua_pushstring(lua, "_stashputkeep: invalid arguments");
+    lua_error(lua);
+  }
+  size_t ksiz;
+  const char *kbuf = lua_tolstring(lua, 1, &ksiz);
+  size_t vsiz;
+  const char *vbuf = lua_tolstring(lua, 2, &vsiz);
+  if(!kbuf || !vbuf){
+    lua_pushstring(lua, "_stashputkeep: invalid arguments");
+    lua_error(lua);
+  }
+  lua_getglobal(lua, SERVVAR);
+  SERV *serv = lua_touserdata(lua, -1);
+  tcmdbputkeep(serv->stash, kbuf, ksiz, vbuf, vsiz);
+  lua_pushboolean(lua, true);
+  return 1;
+}
+
+
+/* for _stashputcat function */
+static int serv_stashputcat(lua_State *lua){
+  int argc = lua_gettop(lua);
+  if(argc != 2){
+    lua_pushstring(lua, "_stashputcat: invalid arguments");
+    lua_error(lua);
+  }
+  size_t ksiz;
+  const char *kbuf = lua_tolstring(lua, 1, &ksiz);
+  size_t vsiz;
+  const char *vbuf = lua_tolstring(lua, 2, &vsiz);
+  if(!kbuf || !vbuf){
+    lua_pushstring(lua, "_stashputcat: invalid arguments");
+    lua_error(lua);
+  }
+  lua_getglobal(lua, SERVVAR);
+  SERV *serv = lua_touserdata(lua, -1);
+  tcmdbputcat(serv->stash, kbuf, ksiz, vbuf, vsiz);
   lua_pushboolean(lua, true);
   return 1;
 }

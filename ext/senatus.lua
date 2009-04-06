@@ -3,17 +3,6 @@
 --
 
 
--- call back function when starting
-function _begin()
-   _log("Lua processor started")
-end
-
-
--- call back function when ending
-function _end()
-   _log("Lua processor finished")
-end
-
 
 -- echo back the key and the value
 function echo(key, value)
@@ -430,6 +419,24 @@ function expire2()
    if not res then
       _log("expiration was failed", 2)
    end
+end
+
+
+
+----------------------------------------------------------------
+-- private functions
+----------------------------------------------------------------
+
+
+-- call back function when starting
+function _begin()
+   _log("Lua processor started")
+end
+
+
+-- call back function when ending
+function _end()
+   _log("Lua processor finished")
 end
 
 

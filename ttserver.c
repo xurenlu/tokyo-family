@@ -24,6 +24,8 @@
 #define DEFTHNUM       8                 // default thread number
 #define DEFPIDPATH     "ttserver.pid"    // default name of the PID file
 #define DEFRTSPATH     "ttserver.rts"    // default name of the RTS file
+#define MAXARGSIZ      (32*1024*1024)    // maximum size of each argument
+#define MAXARGNUM      (1*1024*1024)     // maximum number of arguments
 #define NUMBUFSIZ      32                // size of a numeric buffer
 #define LINEBUFSIZ     8192              // size of a line buffer
 #define TOKENUNIT      256               // unit number of tokens
@@ -947,7 +949,7 @@ static void do_put(TTSOCK *sock, TASKARG *arg, TTREQ *req){
   uint32_t sid = arg->sid;
   int ksiz = ttsockgetint32(sock);
   int vsiz = ttsockgetint32(sock);
-  if(ttsockcheckend(sock) || ksiz < 0 || vsiz < 0){
+  if(ttsockcheckend(sock) || ksiz < 0 || ksiz > MAXARGSIZ || vsiz < 0 || vsiz > MAXARGSIZ){
     ttservlog(g_serv, TTLOGINFO, "do_put: invalid parameters");
     return;
   }
@@ -985,7 +987,7 @@ static void do_putkeep(TTSOCK *sock, TASKARG *arg, TTREQ *req){
   uint32_t sid = arg->sid;
   int ksiz = ttsockgetint32(sock);
   int vsiz = ttsockgetint32(sock);
-  if(ttsockcheckend(sock) || ksiz < 0 || vsiz < 0){
+  if(ttsockcheckend(sock) || ksiz < 0 || ksiz > MAXARGSIZ || vsiz < 0 || vsiz > MAXARGSIZ){
     ttservlog(g_serv, TTLOGINFO, "do_putkeep: invalid parameters");
     return;
   }
@@ -1022,7 +1024,7 @@ static void do_putcat(TTSOCK *sock, TASKARG *arg, TTREQ *req){
   uint32_t sid = arg->sid;
   int ksiz = ttsockgetint32(sock);
   int vsiz = ttsockgetint32(sock);
-  if(ttsockcheckend(sock) || ksiz < 0 || vsiz < 0){
+  if(ttsockcheckend(sock) || ksiz < 0 || ksiz > MAXARGSIZ || vsiz < 0 || vsiz > MAXARGSIZ){
     ttservlog(g_serv, TTLOGINFO, "do_putcat: invalid parameters");
     return;
   }
@@ -1062,7 +1064,8 @@ static void do_putshl(TTSOCK *sock, TASKARG *arg, TTREQ *req){
   int ksiz = ttsockgetint32(sock);
   int vsiz = ttsockgetint32(sock);
   int width = ttsockgetint32(sock);
-  if(ttsockcheckend(sock) || ksiz < 0 || vsiz < 0 || width < 0){
+  if(ttsockcheckend(sock) || ksiz < 0 || ksiz > MAXARGSIZ || vsiz < 0 || vsiz > MAXARGSIZ ||
+     width < 0){
     ttservlog(g_serv, TTLOGINFO, "do_putshl: invalid parameters");
     return;
   }
@@ -1129,7 +1132,7 @@ static void do_putnr(TTSOCK *sock, TASKARG *arg, TTREQ *req){
   uint32_t sid = arg->sid;
   int ksiz = ttsockgetint32(sock);
   int vsiz = ttsockgetint32(sock);
-  if(ttsockcheckend(sock) || ksiz < 0 || vsiz < 0){
+  if(ttsockcheckend(sock) || ksiz < 0 || ksiz > MAXARGSIZ || vsiz < 0 || vsiz > MAXARGSIZ){
     ttservlog(g_serv, TTLOGINFO, "do_putnr: invalid parameters");
     return;
   }
@@ -1162,7 +1165,7 @@ static void do_out(TTSOCK *sock, TASKARG *arg, TTREQ *req){
   TCULOG *ulog = arg->ulog;
   uint32_t sid = arg->sid;
   int ksiz = ttsockgetint32(sock);
-  if(ttsockcheckend(sock) || ksiz < 0){
+  if(ttsockcheckend(sock) || ksiz < 0 || ksiz > MAXARGSIZ){
     ttservlog(g_serv, TTLOGINFO, "do_out: invalid parameters");
     return;
   }
@@ -1195,7 +1198,7 @@ static void do_get(TTSOCK *sock, TASKARG *arg, TTREQ *req){
   uint64_t mask = arg->mask;
   TCADB *adb = arg->adb;
   int ksiz = ttsockgetint32(sock);
-  if(ttsockcheckend(sock) || ksiz < 0){
+  if(ttsockcheckend(sock) || ksiz < 0 || ksiz > MAXARGSIZ){
     ttservlog(g_serv, TTLOGINFO, "do_get: invalid parameters");
     return;
   }
@@ -1249,7 +1252,7 @@ static void do_mget(TTSOCK *sock, TASKARG *arg, TTREQ *req){
   uint64_t mask = arg->mask;
   TCADB *adb = arg->adb;
   int rnum = ttsockgetint32(sock);
-  if(ttsockcheckend(sock) || rnum < 0){
+  if(ttsockcheckend(sock) || rnum < 0 || rnum > MAXARGNUM){
     ttservlog(g_serv, TTLOGINFO, "do_mget: invalid parameters");
     return;
   }
@@ -1258,7 +1261,7 @@ static void do_mget(TTSOCK *sock, TASKARG *arg, TTREQ *req){
   char stack[TTIOBUFSIZ];
   for(int i = 0; i < rnum; i++){
     int ksiz = ttsockgetint32(sock);
-    if(ttsockcheckend(sock) || ksiz < 0) break;
+    if(ttsockcheckend(sock) || ksiz < 0 || ksiz > MAXARGSIZ) break;
     char *buf = (ksiz < TTIOBUFSIZ) ? stack : tcmalloc(ksiz + 1);
     pthread_cleanup_push(free, (buf == stack) ? NULL : buf);
     if(ttsockrecv(sock, buf, ksiz)) tclistpush(keys, buf, ksiz);
@@ -1313,7 +1316,7 @@ static void do_vsiz(TTSOCK *sock, TASKARG *arg, TTREQ *req){
   uint64_t mask = arg->mask;
   TCADB *adb = arg->adb;
   int ksiz = ttsockgetint32(sock);
-  if(ttsockcheckend(sock) || ksiz < 0){
+  if(ttsockcheckend(sock) || ksiz < 0 || ksiz > MAXARGSIZ){
     ttservlog(g_serv, TTLOGINFO, "do_vsiz: invalid parameters");
     return;
   }
@@ -1423,7 +1426,7 @@ static void do_fwmkeys(TTSOCK *sock, TASKARG *arg, TTREQ *req){
   TCADB *adb = arg->adb;
   int psiz = ttsockgetint32(sock);
   int max = ttsockgetint32(sock);
-  if(ttsockcheckend(sock) || psiz < 0){
+  if(ttsockcheckend(sock) || psiz < 0 || psiz > MAXARGSIZ){
     ttservlog(g_serv, TTLOGINFO, "do_fwmkeys: invalid parameters");
     return;
   }
@@ -1477,7 +1480,7 @@ static void do_addint(TTSOCK *sock, TASKARG *arg, TTREQ *req){
   uint32_t sid = arg->sid;
   int ksiz = ttsockgetint32(sock);
   int anum = ttsockgetint32(sock);
-  if(ttsockcheckend(sock) || ksiz < 0){
+  if(ttsockcheckend(sock) || ksiz < 0 || ksiz > MAXARGSIZ){
     ttservlog(g_serv, TTLOGINFO, "do_addint: invalid parameters");
     return;
   }
@@ -1526,7 +1529,8 @@ static void do_adddouble(TTSOCK *sock, TASKARG *arg, TTREQ *req){
   uint32_t sid = arg->sid;
   int ksiz = ttsockgetint32(sock);
   char abuf[sizeof(uint64_t)*2];
-  if(!ttsockrecv(sock, abuf, sizeof(abuf)) || ttsockcheckend(sock) || ksiz < 0){
+  if(!ttsockrecv(sock, abuf, sizeof(abuf)) || ttsockcheckend(sock) ||
+     ksiz < 0 || ksiz > MAXARGSIZ){
     ttservlog(g_serv, TTLOGINFO, "do_adddouble: invalid parameters");
     return;
   }
@@ -1576,7 +1580,8 @@ static void do_ext(TTSOCK *sock, TASKARG *arg, TTREQ *req){
   int opts = ttsockgetint32(sock);
   int ksiz = ttsockgetint32(sock);
   int vsiz = ttsockgetint32(sock);
-  if(ttsockcheckend(sock) || nsiz < 0 || nsiz >= TTADDRBUFSIZ || ksiz < 0 || vsiz < 0){
+  if(ttsockcheckend(sock) || nsiz < 0 || nsiz >= TTADDRBUFSIZ ||
+     ksiz < 0 || ksiz > MAXARGSIZ || vsiz < 0 || vsiz > MAXARGSIZ){
     ttservlog(g_serv, TTLOGINFO, "do_ext: invalid parameters");
     return;
   }
@@ -1708,7 +1713,7 @@ static void do_copy(TTSOCK *sock, TASKARG *arg, TTREQ *req){
   uint64_t mask = arg->mask;
   TCADB *adb = arg->adb;
   int psiz = ttsockgetint32(sock);
-  if(ttsockcheckend(sock) || psiz < 0){
+  if(ttsockcheckend(sock) || psiz < 0 || psiz > MAXARGSIZ){
     ttservlog(g_serv, TTLOGINFO, "do_copy: invalid parameters");
     return;
   }
@@ -1745,7 +1750,7 @@ static void do_restore(TTSOCK *sock, TASKARG *arg, TTREQ *req){
   TCULOG *ulog = arg->ulog;
   int psiz = ttsockgetint32(sock);
   uint64_t ts = ttsockgetint64(sock);
-  if(ttsockcheckend(sock) || psiz < 0){
+  if(ttsockcheckend(sock) || psiz < 0 || psiz > MAXARGSIZ){
     ttservlog(g_serv, TTLOGINFO, "do_restore: invalid parameters");
     return;
   }
@@ -1786,7 +1791,7 @@ static void do_setmst(TTSOCK *sock, TASKARG *arg, TTREQ *req){
   REPLARG *sarg = arg->sarg;
   int hsiz = ttsockgetint32(sock);
   int port = ttsockgetint32(sock);
-  if(ttsockcheckend(sock) || hsiz < 0 || port < 0){
+  if(ttsockcheckend(sock) || hsiz < 0 || hsiz > MAXARGSIZ || port < 0){
     ttservlog(g_serv, TTLOGINFO, "do_setmst: invalid parameters");
     return;
   }
@@ -1933,7 +1938,7 @@ static void do_misc(TTSOCK *sock, TASKARG *arg, TTREQ *req){
   int nsiz = ttsockgetint32(sock);
   int opts = ttsockgetint32(sock);
   int rnum = ttsockgetint32(sock);
-  if(ttsockcheckend(sock) || nsiz < 0 || nsiz >= TTADDRBUFSIZ || rnum < 0){
+  if(ttsockcheckend(sock) || nsiz < 0 || nsiz >= TTADDRBUFSIZ || rnum < 0 || rnum > MAXARGNUM){
     ttservlog(g_serv, TTLOGINFO, "do_misc: invalid parameters");
     return;
   }
@@ -1948,7 +1953,7 @@ static void do_misc(TTSOCK *sock, TASKARG *arg, TTREQ *req){
   char stack[TTIOBUFSIZ];
   for(int i = 0; i < rnum; i++){
     int rsiz = ttsockgetint32(sock);
-    if(ttsockcheckend(sock) || rsiz < 0) break;
+    if(ttsockcheckend(sock) || rsiz < 0 || rsiz > MAXARGSIZ) break;
     char *buf = (rsiz < TTIOBUFSIZ) ? stack : tcmalloc(rsiz + 1);
     pthread_cleanup_push(free, (buf == stack) ? NULL : buf);
     if(ttsockrecv(sock, buf, rsiz)) tclistpush(args, buf, rsiz);

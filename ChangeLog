@@ -1,3 +1,15 @@
+2009-04-01  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	* configure.in: a bug related to support for traditional shells was fixed.
+
+	* scrext.c (serv_stashputkeep, serv_stashputcat): new functions.
+
+	* scrext.c (serv_mapreduce, serv_mapreducemapemit): new functions.
+
+	* ttserver.c (do_put, do_out, do_get): parameter validation was enhanced.
+
+	- Release: 1.1.20
+
 2009-03-14  Mikio Hirabayashi  <mikio@users.sourceforge.net>
 
 	* tcrdb.c (tcrdbqrysearchget): the option for no update log was added.

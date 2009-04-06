@@ -231,13 +231,13 @@ end
 
 -- call back function when starting
 function _begin()
-   _log("Inverted index started")
+   _log("Lua processor started")
 end
 
 
 -- call back function when ending
 function _end()
-   _log("Inverted index finished")
+   _log("Lua processor finished")
 end
 
 
