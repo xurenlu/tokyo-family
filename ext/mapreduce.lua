@@ -10,11 +10,7 @@
 
 
 -- count words of all records
-function wordcount(sid, texpr)
-   sid = tonumber(sid)
-   if not sid then
-      sid = math.floor(_time()) % 65535 + 1
-   end
+function wordcount(texpr)
    local targets = nil
    if texpr and #texpr > 0 then
       targets = {}
@@ -31,7 +27,7 @@ function wordcount(sid, texpr)
       res = res .. key .. "\t" .. #values .. "\n"
       return true
    end
-   if not _mapreduce(sid, targets, mapper, reducer) then
+   if not _mapreduce(targets, mapper, reducer) then
       res = nil
    end
    return res

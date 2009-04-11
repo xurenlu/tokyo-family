@@ -465,8 +465,12 @@ static int serv_putfunc(lua_State *lua){
     lua_pushstring(lua, "putfunc: invalid arguments");
     lua_error(lua);
   }
+
+  /*
   lua_getglobal(lua, SERVVAR);
   SERV *serv = lua_touserdata(lua, -1);
+  */
+
   bool err = false;
 
   printf("%s:%s\n", name, expr);
@@ -884,64 +888,54 @@ static int serv_foreach(lua_State *lua){
 /* for _mapreduce function */
 static int serv_mapreduce(lua_State *lua){
   int argc = lua_gettop(lua);
-  if(argc < 1){
+  if(argc < 3){
     lua_pushstring(lua, "_mapreduce: invalid arguments");
     lua_error(lua);
   }
-  int id = lua_tonumber(lua, 1);
-  if(id < 1){
+  if(!lua_isfunction(lua, 2) || !lua_isfunction(lua, 3)){
     lua_pushstring(lua, "_mapreduce: invalid arguments");
     lua_error(lua);
   }
   lua_getglobal(lua, SERVVAR);
   SERV *serv = lua_touserdata(lua, -1);
   TCLIST *keys = NULL;
-  if(argc > 1){
-    const char *kbuf;
-    size_t ksiz;
-    int len;
-    switch(lua_type(lua, 2)){
-    case LUA_TNUMBER:
-    case LUA_TSTRING:
-      keys = tclistnew2(1);
-      kbuf = lua_tolstring(lua, 2, &ksiz);
-      tclistpush(keys, kbuf, ksiz);
-      break;
-    case LUA_TTABLE:
-      len = lua_objlen(lua, 2);
-      keys = tclistnew2(len);
-      for(int i = 1; i <= len; i++){
-        lua_rawgeti(lua, 2, i);
-        switch(lua_type(lua, -1)){
-        case LUA_TNUMBER:
-        case LUA_TSTRING:
-          kbuf = lua_tolstring(lua, -1, &ksiz);
-          tclistpush(keys, kbuf, ksiz);
-          break;
-        }
-        lua_pop(lua, 1);
+  const char *kbuf;
+  size_t ksiz;
+  int len;
+  switch(lua_type(lua, 1)){
+  case LUA_TNUMBER:
+  case LUA_TSTRING:
+    keys = tclistnew2(1);
+    kbuf = lua_tolstring(lua, 1, &ksiz);
+    tclistpush(keys, kbuf, ksiz);
+    break;
+  case LUA_TTABLE:
+    len = lua_objlen(lua, 1);
+    keys = tclistnew2(len);
+    for(int i = 1; i <= len; i++){
+      lua_rawgeti(lua, 1, i);
+      switch(lua_type(lua, -1)){
+      case LUA_TNUMBER:
+      case LUA_TSTRING:
+        kbuf = lua_tolstring(lua, -1, &ksiz);
+        tclistpush(keys, kbuf, ksiz);
+        break;
       }
-      break;
+      lua_pop(lua, 1);
     }
+    break;
   }
-  if(argc > 2 && lua_isfunction(lua, 3)){
-    lua_pushvalue(lua, 3);
-  } else {
-    lua_pushnil(lua);
-  }
+  lua_pushvalue(lua, 2);
   lua_setglobal(lua, MRMAPVAR);
-  if(argc > 3 && lua_isfunction(lua, 4)){
-    lua_pushvalue(lua, 4);
-  } else {
-    lua_pushnil(lua);
-  }
+  lua_pushvalue(lua, 3);
   lua_setglobal(lua, MRREDVAR);
   bool err = false;
   TCBDB *bdb = tcbdbnew();
   lua_getglobal(lua, "_tmpdir_");
   const char *tmpdir = lua_tostring(lua, -1);
   if(!tmpdir) tmpdir = "/tmp";
-  char *path = tcsprintf("%s%c%s-%d-%d", tmpdir, MYPATHCHR, "mapbdb", getpid(), id);
+  char *path = tcsprintf("%s%c%s-%d-%u",
+                         tmpdir, MYPATHCHR, "mapbdb", getpid(), (unsigned int)(tctime() * 1000));
   unlink(path);
   if(!tcbdbopen(bdb, path, BDBOWRITER | BDBOCREAT | BDBOTRUNC)) err = true;
   unlink(path);
@@ -969,8 +963,8 @@ static int serv_mapreduce(lua_State *lua){
           } else if(lua_gettop(lua) < 1 || !lua_toboolean(lua, 1)){
             err = true;
           }
-          lua_settop(lua, 0);
         }
+        lua_settop(lua, 0);
         lua_getglobal(lua, MRREDVAR);
         lua_pushlstring(lua, kbuf, ksiz);
         lua_newtable(lua);

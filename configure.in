@@ -7,11 +7,11 @@
 #================================================================
 
 # Package name
-AC_INIT(tokyotyrant, 1.1.20)
+AC_INIT(tokyotyrant, 1.1.21)
 
 # Package information
 MYLIBVER=3
-MYLIBREV=4
+MYLIBREV=5
 MYPROTVER="0.9"
 
 # Targets

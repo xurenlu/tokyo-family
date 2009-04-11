@@ -1,3 +1,9 @@
+2009-04-06  Mikio Hirabayashi  <mikio@users.sourceforge.net>
+
+	* scrext.c (serv_mapreduce): the parameter for the session ID was abolished.
+
+	- Release: 1.1.21
+
 2009-04-01  Mikio Hirabayashi  <mikio@users.sourceforge.net>
 
 	* configure.in: a bug related to support for traditional shells was fixed.
