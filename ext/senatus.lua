@@ -379,6 +379,15 @@ function mkdir(key, value)
 end
 
 
+-- evaluate a string
+function eval(key, value)
+   if not _eval(key) then
+      return nil
+   end
+   return "ok"
+end
+
+
 -- log a string
 function log(key, value)
    local level = tonumber(value)
@@ -387,12 +396,6 @@ function log(key, value)
    end
    _log(key, level)
    return "ok"
-end
-
-
--- print a string
-function hello()
-   print("hello: " .. _time())
 end
 
 

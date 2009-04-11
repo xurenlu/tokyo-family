@@ -26,7 +26,8 @@
 #if defined(TTNOEXT)
 
 
-typedef struct {                         // type of structure of the script extension
+typedef struct _SCREXT {                 // type of structure of the script extension
+  struct _SCREXT **screxts;              // script extension objects
   int thnum;                             // number of native threads
   int thid;                              // thread ID
   char *path;                            // path of the initializing script
@@ -42,10 +43,11 @@ typedef struct {                         // type of structure of the script exte
 
 
 /* Initialize the global scripting language extension. */
-void *scrextnew(int thnum, int thid, const char *path, TCADB *adb, TCULOG *ulog,
+void *scrextnew(void **screxts, int thnum, int thid, const char *path, TCADB *adb, TCULOG *ulog,
                 uint32_t sid, TCMDB *stash, pthread_mutex_t *lcks, int lcknum,
                 void (*logger)(int, const char *, void *), void *logopq){
   SCREXT *scr = tcmalloc(sizeof(*scr));
+  scr->screxts = (SCREXT **)screxts;
   scr->thnum = thnum;
   scr->thid = thid;
   scr->path = tcstrdup(path);
@@ -150,12 +152,15 @@ char *scrextcallmethod(void *scr, const char *name,
 #define MRPOOLVAR    "_mrpool_"          // global variable name for mapreduce pool
 
 typedef struct {                         // type of structure of the script extension
+  lua_State *lua;                        // Lua environment
   int thnum;                             // number of native threads
   int thid;                              // thread ID
-  lua_State *lua;                        // Lua environment
 } SCREXT;
 
 typedef struct {                         // type of structure of the server data
+  SCREXT **screxts;                      // script extension objects
+  int thnum;                             // number of native threads
+  int thid;                              // thread ID
   TCADB *adb;                            // abstract database object
   TCULOG *ulog;                          // update log object
   uint32_t sid;                          // server ID
@@ -171,7 +176,7 @@ typedef struct {                         // type of structure of the server data
 static void reporterror(lua_State *lua);
 static int lockmtxidx(const char *kbuf, int ksiz, int lcknum);
 static bool iterrec(const void *kbuf, int ksiz, const void *vbuf, int vsiz, lua_State *lua);
-static int serv_putfunc(lua_State *lua);
+static int serv_eval(lua_State *lua);
 static int serv_log(lua_State *lua);
 static int serv_put(lua_State *lua);
 static int serv_putkeep(lua_State *lua);
@@ -216,7 +221,7 @@ static int serv_mkdir(lua_State *lua);
 
 
 /* Initialize the global scripting language extension. */
-void *scrextnew(int thnum, int thid, const char *path, TCADB *adb, TCULOG *ulog,
+void *scrextnew(void **screxts, int thnum, int thid, const char *path, TCADB *adb, TCULOG *ulog,
                 uint32_t sid, TCMDB *stash, pthread_mutex_t *lcks, int lcknum,
                 void (*logger)(int, const char *, void *), void *logopq){
   char *ibuf;
@@ -239,6 +244,9 @@ void *scrextnew(int thnum, int thid, const char *path, TCADB *adb, TCULOG *ulog,
   luaL_openlibs(lua);
   lua_settop(lua, 0);
   SERV *serv = lua_newuserdata(lua, sizeof(*serv));
+  serv->screxts = (SCREXT **)screxts;
+  serv->thnum = thnum;
+  serv->thid = thid;
   serv->adb = adb;
   serv->ulog = ulog;
   serv->sid = sid;
@@ -248,7 +256,7 @@ void *scrextnew(int thnum, int thid, const char *path, TCADB *adb, TCULOG *ulog,
   serv->logger = logger;
   serv->logopq = logopq;
   lua_setglobal(lua, SERVVAR);
-  lua_register(lua, "putfunc", serv_putfunc);
+  lua_register(lua, "_eval", serv_eval);
   lua_register(lua, "_log", serv_log);
   lua_register(lua, "_put", serv_put);
   lua_register(lua, "_putkeep", serv_putkeep);
@@ -308,9 +316,9 @@ void *scrextnew(int thnum, int thid, const char *path, TCADB *adb, TCULOG *ulog,
   }
   lua_settop(lua, 0);
   SCREXT *scr = tcmalloc(sizeof(*scr));
+  scr->lua = lua;
   scr->thnum = thnum;
   scr->thid = thid;
-  scr->lua = lua;
   return scr;
 }
 
@@ -452,37 +460,35 @@ static bool maprec(void *map, const void *kbuf, int ksiz, const void *vbuf, int 
 }
 
 
-/* for putfunc function */
-static int serv_putfunc(lua_State *lua){
+/* for _eval function */
+static int serv_eval(lua_State *lua){
   int argc = lua_gettop(lua);
-  if(argc != 2){
-    lua_pushstring(lua, "putfunc: invalid arguments");
+  if(argc != 1){
+    lua_pushstring(lua, "_eval: invalid arguments");
     lua_error(lua);
   }
-  const char *name = lua_tostring(lua, 1);
-  const char *expr = lua_tostring(lua, 2);
-  if(!name || !expr){
-    lua_pushstring(lua, "putfunc: invalid arguments");
+  const char *expr = lua_tostring(lua, 1);
+  if(!expr){
+    lua_pushstring(lua, "_eval: invalid arguments");
     lua_error(lua);
   }
-
-  /*
   lua_getglobal(lua, SERVVAR);
   SERV *serv = lua_touserdata(lua, -1);
-  */
-
+  SCREXT **screxts = serv->screxts;
+  int thnum = serv->thnum;
   bool err = false;
-
-  printf("%s:%s\n", name, expr);
-
-
-
-  lua_settop(lua, 0);
-  if(err){
-    lua_pushnil(lua);
-  } else {
-    lua_pushstring(lua, "ok");
+  for(int i = 0; i < thnum; i++){
+    if(!screxts[i]){
+      lua_pushstring(lua, "_eval: not ready");
+      lua_error(lua);
+    }
   }
+  for(int i = 0; i < thnum; i++){
+    lua_State *elua = screxts[i]->lua;
+    if(luaL_loadstring(elua, expr) != 0 || lua_pcall(elua, 0, 0, 0) != 0) reporterror(elua);
+  }
+  lua_settop(lua, 0);
+  lua_pushboolean(lua, !err);
   return 1;
 }
 

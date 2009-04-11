@@ -539,7 +539,10 @@ static int proc(const char *dbname, const char *host, int port, int thnum, int t
     }
     bool screrr = false;
     for(int i = 0; i < thnum; i++){
-      screxts[i] = scrextnew(thnum, i, extpath, adb, ulog, sid, scrstash,
+      screxts[i] = NULL;
+    }
+    for(int i = 0; i < thnum; i++){
+      screxts[i] = scrextnew(screxts, thnum, i, extpath, adb, ulog, sid, scrstash,
                              scrlcks, RECMTXNUM, do_log, &larg);
       if(!screxts[i]) screrr = true;
     }
@@ -579,7 +582,7 @@ static int proc(const char *dbname, const char *host, int port, int thnum, int t
       pcarg->ulog = ulog;
       pcarg->sid = sid;
       pcarg->sarg = &sarg;
-      pcarg->scrext = scrextnew(thnum, thnum + i, extpath, adb, ulog, sid, scrstash,
+      pcarg->scrext = scrextnew(screxts, thnum, thnum + i, extpath, adb, ulog, sid, scrstash,
                                 scrlcks, RECMTXNUM, do_log, &larg);
       if(pcarg->scrext){
         if(*name && period > 0) ttservaddtimedhandler(g_serv, period, do_extpc, pcarg);

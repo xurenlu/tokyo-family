@@ -1256,6 +1256,10 @@ int main(int argc, char **argv){
 <p>The following build-in functions for database operations are available in user defined functions.  The type of `key' and `value' parameters should be string or number.  If number is given, it is converted as decimal string.</p>
 
 <dl>
+<dt><code>_eval(<var>chunk</var>)</code></dt>
+<dd>Evaluate a Lua chunk in each native thread.</dd>
+<dd>`<var>chunk</var>' specifies the Lua chunk string.</dd>
+<dd>If successful, the return value is true, else, it is false.</dd>
 <dt><code>_log(<var>message</var>, <var>level</var>)</code></dt>
 <dd>Print a message into the server log.</dd>
 <dd>`<var>message</var>' specifies the message string.</dd>

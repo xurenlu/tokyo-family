@@ -44,6 +44,7 @@
 
 
 /* Initialize the scripting language extension.
+   `screxts' specifies an array of the scripting language extension objects.
    `thnum' specifies the number of the native threads.
    `thid' specifies the thread ID number.
    `path' specifies the path of the initilizing script.
@@ -56,7 +57,7 @@
    `logger' specifies the pointer to a function to do with a log message.
    `logopq' specifies the opaque pointer for the logging function.
    The return value is the scripting object or `NULL' on failure. */
-void *scrextnew(int thnum, int thid, const char *path, TCADB *adb, TCULOG *ulog,
+void *scrextnew(void **screxts, int thnum, int thid, const char *path, TCADB *adb, TCULOG *ulog,
                 uint32_t sid, TCMDB *stash, pthread_mutex_t *lcks, int lcknum,
                 void (*logger)(int, const char *, void *), void *logopq);
 
