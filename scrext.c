@@ -888,47 +888,49 @@ static int serv_foreach(lua_State *lua){
 /* for _mapreduce function */
 static int serv_mapreduce(lua_State *lua){
   int argc = lua_gettop(lua);
-  if(argc < 3){
+  if(argc < 2){
     lua_pushstring(lua, "_mapreduce: invalid arguments");
     lua_error(lua);
   }
-  if(!lua_isfunction(lua, 2) || !lua_isfunction(lua, 3)){
+  if(!lua_isfunction(lua, 1) || !lua_isfunction(lua, 2)){
     lua_pushstring(lua, "_mapreduce: invalid arguments");
     lua_error(lua);
+  }
+  lua_pushvalue(lua, 1);
+  lua_setglobal(lua, MRMAPVAR);
+  lua_pushvalue(lua, 2);
+  lua_setglobal(lua, MRREDVAR);
+  TCLIST *keys = NULL;
+  if(argc > 2){
+    const char *kbuf;
+    size_t ksiz;
+    int len;
+    switch(lua_type(lua, 3)){
+    case LUA_TNUMBER:
+    case LUA_TSTRING:
+      keys = tclistnew2(1);
+      kbuf = lua_tolstring(lua, 3, &ksiz);
+      tclistpush(keys, kbuf, ksiz);
+      break;
+    case LUA_TTABLE:
+      len = lua_objlen(lua, 3);
+      keys = tclistnew2(len);
+      for(int i = 1; i <= len; i++){
+        lua_rawgeti(lua, 3, i);
+        switch(lua_type(lua, -1)){
+        case LUA_TNUMBER:
+        case LUA_TSTRING:
+          kbuf = lua_tolstring(lua, -1, &ksiz);
+          tclistpush(keys, kbuf, ksiz);
+          break;
+        }
+        lua_pop(lua, 1);
+      }
+      break;
+    }
   }
   lua_getglobal(lua, SERVVAR);
   SERV *serv = lua_touserdata(lua, -1);
-  TCLIST *keys = NULL;
-  const char *kbuf;
-  size_t ksiz;
-  int len;
-  switch(lua_type(lua, 1)){
-  case LUA_TNUMBER:
-  case LUA_TSTRING:
-    keys = tclistnew2(1);
-    kbuf = lua_tolstring(lua, 1, &ksiz);
-    tclistpush(keys, kbuf, ksiz);
-    break;
-  case LUA_TTABLE:
-    len = lua_objlen(lua, 1);
-    keys = tclistnew2(len);
-    for(int i = 1; i <= len; i++){
-      lua_rawgeti(lua, 1, i);
-      switch(lua_type(lua, -1)){
-      case LUA_TNUMBER:
-      case LUA_TSTRING:
-        kbuf = lua_tolstring(lua, -1, &ksiz);
-        tclistpush(keys, kbuf, ksiz);
-        break;
-      }
-      lua_pop(lua, 1);
-    }
-    break;
-  }
-  lua_pushvalue(lua, 2);
-  lua_setglobal(lua, MRMAPVAR);
-  lua_pushvalue(lua, 3);
-  lua_setglobal(lua, MRREDVAR);
   bool err = false;
   TCBDB *bdb = tcbdbnew();
   lua_getglobal(lua, "_tmpdir_");

@@ -27,7 +27,7 @@ function wordcount(texpr)
       res = res .. key .. "\t" .. #values .. "\n"
       return true
    end
-   if not _mapreduce(targets, mapper, reducer) then
+   if not _mapreduce(mapper, reducer, targets) then
       res = nil
    end
    return res
