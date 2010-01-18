@@ -292,6 +292,8 @@ typedef struct _TTTIMER {                /* type of structure for a timer */
   double freq_timed;                     /* frequency of timed handler */
   void (*do_timed)(void *);              /* call back function for timed handler */
   void *opq_timed;                       /* opaque pointer for timed handler */
+  bool delay;     /** set to false when started; */
+  bool started;/** set to true when started;*/
 } TTTIMER;
 
 typedef struct _TTREQ {                  /* type of structure for a server */
@@ -376,6 +378,13 @@ void ttservsetloghandler(TTSERV *serv, void (*do_log)(int, const char *, void *)
    opaque pointer.
    `opq' specifies the opaque pointer to be passed to the handler.  It can be `NULL'. */
 void ttservaddtimedhandler(TTSERV *serv, double freq, void (*do_timed)(void *), void *opq);
+/* Add a timed handler to a server object.
+   `serv' specifies the server object.
+   `freq' specifies the frequency of execution in seconds.
+   `do_timed' specifies the pointer to a function to do with a event.  Its parameter is the
+   opaque pointer.
+   `opq' specifies the opaque pointer to be passed to the handler.  It can be `NULL'. */
+void ttservaddtimedhandler_delay(TTSERV *serv, double freq, void (*do_timed)(void *), void *opq);
 
 
 /* Set the response handler of a server object.

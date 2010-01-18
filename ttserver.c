@@ -79,6 +79,8 @@ typedef struct {                         // type of structure of master synchron
   uint32_t sid;
   bool fail;
   bool recon;
+  bool delay;
+  bool started;
 } REPLARG;
 
 typedef struct {                         // type of structure of periodic command
@@ -167,6 +169,10 @@ static void do_http_head(TTSOCK *sock, TASKARG *arg, TTREQ *req, int ver, const 
 static void do_http_put(TTSOCK *sock, TASKARG *arg, TTREQ *req, int ver, const char *uri);
 static void do_http_post(TTSOCK *sock, TASKARG *arg, TTREQ *req, int ver, const char *uri);
 static void do_http_delete(TTSOCK *sock, TASKARG *arg, TTREQ *req, int ver, const char *uri);
+static void do_ext_addrepl(TTSOCK *sock, TASKARG *arg, TTREQ *req, char **tokens, int tnum);
+static void do_ext_delrepl(TTSOCK *sock, TASKARG *arg, TTREQ *req, char **tokens, int tnum);
+bool ttservmodifytimedhandler( const char * host, int port, const char * rtspath,TTSERV * serv);
+bool ttservdeltimedhandler( const char * host, int port, const char * rtspath,TTSERV * serv);
 
 
 /* main routine */
@@ -567,7 +573,49 @@ static int proc(const char *dbname, const char *host, int port, int thnum, int t
   sarg.sid = sid;
   sarg.fail = false;
   sarg.recon = false;
+  sarg.delay=false;
   if(!(mask & TTMSKSLAVE)) ttservaddtimedhandler(g_serv, 1.0, do_slave, &sarg);
+
+  REPLARG sarg2;
+  snprintf(sarg2.host, TTADDRBUFSIZ, "%s", mhost ? mhost : "");
+  sarg2.port = mport;
+  sarg2.rtspath = rtspath;
+  sarg2.rts = 0;
+  sarg2.adb = adb;
+  sarg2.ulog = ulog;
+  sarg2.sid = sid;
+  sarg2.fail = false;
+  sarg2.recon = false;
+  sarg2.delay=false;
+  if(!(mask & TTMSKSLAVE)) ttservaddtimedhandler_delay(g_serv, 1.0, do_slave, &sarg2);
+
+  REPLARG sarg3;
+  snprintf(sarg3.host, TTADDRBUFSIZ, "%s", mhost ? mhost : "");
+  sarg3.port = mport;
+  sarg3.rtspath = rtspath;
+  sarg3.rts = 0;
+  sarg3.adb = adb;
+  sarg3.ulog = ulog;
+  sarg3.sid = sid;
+  sarg3.fail = false;
+  sarg3.recon = false;
+  sarg3.delay=false;
+  if(!(mask & TTMSKSLAVE)) ttservaddtimedhandler_delay(g_serv, 1.0, do_slave, &sarg3);
+
+  REPLARG sarg4;
+  snprintf(sarg4.host, TTADDRBUFSIZ, "%s", mhost ? mhost : "");
+  sarg4.port = mport;
+  sarg4.rtspath = rtspath;
+  sarg4.rts = 0;
+  sarg4.adb = adb;
+  sarg4.ulog = ulog;
+  sarg4.sid = sid;
+  sarg4.fail = false;
+  sarg4.recon = false;
+  sarg4.delay=false;
+  if(!(mask & TTMSKSLAVE)) ttservaddtimedhandler_delay(g_serv, 1.0, do_slave, &sarg4);
+
+
   EXTPCARG *pcargs = NULL;
   int pcnum = 0;
   if(extpath && extpcs){
@@ -694,6 +742,7 @@ static void do_slave(void *opq){
   TCADB *adb = arg->adb;
   TCULOG *ulog = arg->ulog;
   uint32_t sid = arg->sid;
+  fprintf(stderr,"do_slave:%s,port:%d,rtspath:%s\n",arg->host,arg->port,arg->rtspath);
   if(arg->host[0] == '\0' || arg->port < 1) return;
   int rtsfd = open(arg->rtspath, O_RDWR | O_CREAT, 00644);
   if(rtsfd == -1){
@@ -868,6 +917,10 @@ static void do_task(TTSOCK *sock, void *opq, TTREQ *req){
           do_mc_get(sock, arg, req, tokens, tnum);
         } else if(!strcmp(cmd, "delete")){
           do_mc_delete(sock, arg, req, tokens, tnum);
+        } else if(!strcmp(cmd,"addrepl")){
+          do_ext_addrepl(sock,arg,req,tokens,tnum);
+        } else if(!strcmp(cmd,"delrepl")){
+          do_ext_delrepl(sock,arg,req,tokens,tnum);
         } else if(!strcmp(cmd, "incr")){
           do_mc_incr(sock, arg, req, tokens, tnum);
         } else if(!strcmp(cmd, "decr")){
@@ -2071,20 +2124,52 @@ static void do_repl(TTSOCK *sock, TASKARG *arg, TTREQ *req){
     ttservlog(g_serv, TTLOGERROR, "do_repl: tculrdnew failed");
   }
 }
+static void do_ext_delrepl(TTSOCK *sock, TASKARG *arg, TTREQ *req, char **tokens, int tnum){
+  ttservlog(g_serv, TTLOGDEBUG, "doing ext_addrepl command");
+  if(tnum < 4){
+    ttsockprintf(sock, "CLIENT_ERROR error\r\n");
+    return;
+  }
+  bool nr = tnum > 4 && !strcmp(tokens[4], "noreply");
+  
+  const char *host = tokens[1];
+  int port = atoi(tokens[2]);
+  const char * rptpath = tokens[3];
+    req->keep=true;
+  ttservdeltimedhandler(host,port,rptpath,g_serv);
+  if(!nr)
+      ttsockprintf(sock,"OK\n");
+}
 
+static void do_ext_addrepl(TTSOCK *sock, TASKARG *arg, TTREQ *req, char **tokens, int tnum){
+  ttservlog(g_serv, TTLOGDEBUG, "doing ext_addrepl command");
+  if(tnum < 4){
+    ttsockprintf(sock, "CLIENT_ERROR error\r\n");
+    return;
+  }
+  bool nr = tnum > 4 && !strcmp(tokens[4], "noreply");
+  
+  const char *host = tokens[1];
+  int port = atoi(tokens[2]);
+  const char * rptpath = tokens[3];
 
+    req->keep=true;
+  ttservmodifytimedhandler(host,port,rptpath,g_serv);
+  if(!nr)
+      ttsockprintf(sock,"OK\n");
+}
 /* handle the memcached set command */
 static void do_mc_set(TTSOCK *sock, TASKARG *arg, TTREQ *req, char **tokens, int tnum){
   ttservlog(g_serv, TTLOGDEBUG, "doing mc_set command");
-  uint64_t mask = arg->mask;
-  TCADB *adb = arg->adb;
-  TCULOG *ulog = arg->ulog;
-  uint32_t sid = arg->sid;
   if(tnum < 5){
     ttsockprintf(sock, "CLIENT_ERROR error\r\n");
     return;
   }
   bool nr = tnum > 5 && !strcmp(tokens[5], "noreply");
+  uint64_t mask = arg->mask;
+  TCADB *adb = arg->adb;
+  TCULOG *ulog = arg->ulog;
+  uint32_t sid = arg->sid;
   const char *kbuf = tokens[1];
   int ksiz = strlen(kbuf);
   int vsiz = tclmax(tcatoi(tokens[4]), 0);

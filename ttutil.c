@@ -16,6 +16,7 @@
 
 #include "ttutil.h"
 #include "myconf.h"
+#include <tculog.h>
 
 
 
@@ -33,6 +34,19 @@
 #define HTTPBODYMAXSIZ (256*1024*1024)   // maximum size of the entity body of HTTP
 #define TRILLIONNUM    1000000000000     // trillion number
 
+typedef struct {                         // type of structure of master synchronous object
+  char host[TTADDRBUFSIZ];
+  int port;
+  const char *rtspath;
+  uint64_t rts;
+  TCADB *adb;
+  TCULOG *ulog;
+  uint32_t sid;
+  bool fail;
+  bool recon;
+  bool delay;
+  bool started;
+} REPLARG;
 
 /* String containing the version information. */
 const char *ttversion = _TT_VERSION;
@@ -876,7 +890,56 @@ void ttservsetloghandler(TTSERV *serv, void (*do_log)(int, const char *, void *)
   serv->do_log = do_log;
   serv->opq_log = opq;
 }
+/* Add a timed handler to a server object. */
+bool ttservmodifytimedhandler( const char * host, int port, const char * rtspath,TTSERV * serv)
+{
+  assert(serv && freq >= 0.0 && do_timed);
+    bool err=false;
+  for(int i = 0; i < serv->timernum; i++){
+    TTTIMER *timer = serv->timers + i;
+    if(!timer->started){
+        timer->alive= false;
+        timer->serv = serv;
+  REPLARG * sarg;
+        sarg=(REPLARG *)timer->opq_timed;
+  snprintf(sarg->host, TTADDRBUFSIZ, "%s", host ? host : "");
+  sarg->port = port;
+  sarg->rtspath = rtspath;
+        if(pthread_create(&(timer->thid), NULL, ttservtimer, timer) == 0){
+          ttservlog(serv, TTLOGINFO, "timer thread %d started", i + 1);
+          timer->alive = true;
+          timer->started=true;
+        } else {
+          ttservlog(serv, TTLOGERROR, "pthread_create (ttservtimer) failed");
+          err = true;
+        }
+    }
+  }
+}
+/* Add a timed handler to a server object. */
+bool ttservdeltimedhandler( const char * host, int port, const char * rtspath,TTSERV * serv)
+{
+  assert(serv && freq >= 0.0 && do_timed);
+    bool err=false;
+    int cal=-99;
+    for(int i = 0; i < serv->timernum; i++){
+        TTTIMER *timer = serv->timers + i;
+        if(timer->started){
+            timer->alive= false;
+            timer->serv = serv;
+            REPLARG * sarg;
+            sarg=(REPLARG *)timer->opq_timed;
+            printf("new started repl:%s,%d,%s\n",sarg->host,sarg->port,sarg->rtspath);
+            if(sarg->port!=port) continue;
+            if(strcmp(sarg->host,host)) continue;
+            if(strcmp(sarg->rtspath,rtspath)) continue;
+            printf("new started repl:%s,%d,%s\n",sarg->host,sarg->port,sarg->rtspath);
+            cal=pthread_cancel(timer->thid);
+            printf("cancel result:%d\n",cal);
 
+        }
+    }
+}
 
 /* Add a timed handler to a server object. */
 void ttservaddtimedhandler(TTSERV *serv, double freq, void (*do_timed)(void *), void *opq){
@@ -886,9 +949,23 @@ void ttservaddtimedhandler(TTSERV *serv, double freq, void (*do_timed)(void *), 
   timer->freq_timed = freq;
   timer->do_timed = do_timed;
   timer->opq_timed = opq;
+  timer->delay=false;
+  timer->started=false;
   serv->timernum++;
 }
 
+/* Add a timed handler to a server object. */
+void ttservaddtimedhandler_delay(TTSERV *serv, double freq, void (*do_timed)(void *), void *opq){
+  assert(serv && freq >= 0.0 && do_timed);
+  if(serv->timernum >= TTTIMERMAX - 1) return;
+  TTTIMER *timer = serv->timers + serv->timernum;
+  timer->freq_timed = freq;
+  timer->do_timed = do_timed;
+  timer->opq_timed = opq;
+  timer->delay=true;
+  timer->started=false;
+  serv->timernum++;
+}
 
 /* Set the response handler of a server object. */
 void ttservsettaskhandler(TTSERV *serv, void (*do_task)(TTSOCK *, void *, TTREQ *), void *opq){
@@ -925,14 +1002,16 @@ bool ttservstart(TTSERV *serv){
   bool err = false;
   for(int i = 0; i < serv->timernum; i++){
     TTTIMER *timer = serv->timers + i;
-    timer->alive = false;
-    timer->serv = serv;
-    if(pthread_create(&(timer->thid), NULL, ttservtimer, timer) == 0){
-      ttservlog(serv, TTLOGINFO, "timer thread %d started", i + 1);
-      timer->alive = true;
-    } else {
-      ttservlog(serv, TTLOGERROR, "pthread_create (ttservtimer) failed");
-      err = true;
+    if(!timer->delay){
+        timer->alive = false;
+        timer->serv = serv;
+        if(pthread_create(&(timer->thid), NULL, ttservtimer, timer) == 0){
+          ttservlog(serv, TTLOGINFO, "timer thread %d started", i + 1);
+          timer->alive = true;
+        } else {
+          ttservlog(serv, TTLOGERROR, "pthread_create (ttservtimer) failed");
+          err = true;
+        }
     }
   }
   int thnum = serv->thnum;
