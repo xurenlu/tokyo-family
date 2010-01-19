@@ -81,6 +81,7 @@ typedef struct {                         // type of structure of master synchron
   bool recon;
   bool delay;
   bool started;
+  bool exit;
 } REPLARG;
 
 typedef struct {                         // type of structure of periodic command
@@ -574,6 +575,7 @@ static int proc(const char *dbname, const char *host, int port, int thnum, int t
   sarg.fail = false;
   sarg.recon = false;
   sarg.delay=false;
+  sarg.exit=false;
   if(!(mask & TTMSKSLAVE)) ttservaddtimedhandler(g_serv, 1.0, do_slave, &sarg);
 
   REPLARG sarg2;
@@ -587,6 +589,7 @@ static int proc(const char *dbname, const char *host, int port, int thnum, int t
   sarg2.fail = false;
   sarg2.recon = false;
   sarg2.delay=false;
+  sarg2.exit=false;
   if(!(mask & TTMSKSLAVE)) ttservaddtimedhandler_delay(g_serv, 1.0, do_slave, &sarg2);
 
   REPLARG sarg3;
@@ -600,6 +603,7 @@ static int proc(const char *dbname, const char *host, int port, int thnum, int t
   sarg3.fail = false;
   sarg3.recon = false;
   sarg3.delay=false;
+  sarg3.exit=false;
   if(!(mask & TTMSKSLAVE)) ttservaddtimedhandler_delay(g_serv, 1.0, do_slave, &sarg3);
 
   REPLARG sarg4;
@@ -613,6 +617,7 @@ static int proc(const char *dbname, const char *host, int port, int thnum, int t
   sarg4.fail = false;
   sarg4.recon = false;
   sarg4.delay=false;
+  sarg4.exit=false;
   if(!(mask & TTMSKSLAVE)) ttservaddtimedhandler_delay(g_serv, 1.0, do_slave, &sarg4);
 
 
@@ -742,6 +747,12 @@ static void do_slave(void *opq){
   TCADB *adb = arg->adb;
   TCULOG *ulog = arg->ulog;
   uint32_t sid = arg->sid;
+  if(arg->exit){
+        printf("exit becaues arg->exit is true\n");
+        pthread_mutex_unlock(&g_serv->tmtx);
+        pthread_exit(NULL);
+        return ;
+  }
   fprintf(stderr,"do_slave:%s,port:%d,rtspath:%s\n",arg->host,arg->port,arg->rtspath);
   if(arg->host[0] == '\0' || arg->port < 1) return;
   int rtsfd = open(arg->rtspath, O_RDWR | O_CREAT, 00644);

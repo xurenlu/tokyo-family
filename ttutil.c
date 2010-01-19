@@ -46,6 +46,7 @@ typedef struct {                         // type of structure of master synchron
   bool recon;
   bool delay;
   bool started;
+  bool exit;
 } REPLARG;
 
 /* String containing the version information. */
@@ -893,25 +894,33 @@ void ttservsetloghandler(TTSERV *serv, void (*do_log)(int, const char *, void *)
 /* Add a timed handler to a server object. */
 bool ttservmodifytimedhandler( const char * host, int port, const char * rtspath,TTSERV * serv)
 {
-  assert(serv && freq >= 0.0 && do_timed);
+  assert(serv );
     bool err=false;
   for(int i = 0; i < serv->timernum; i++){
     TTTIMER *timer = serv->timers + i;
     if(!timer->started){
+        printf("timer %d not started,try to started\n",i);
         timer->alive= false;
         timer->serv = serv;
-  REPLARG * sarg;
+        REPLARG * sarg;
         sarg=(REPLARG *)timer->opq_timed;
-  snprintf(sarg->host, TTADDRBUFSIZ, "%s", host ? host : "");
-  sarg->port = port;
-  sarg->rtspath = rtspath;
+        snprintf(sarg->host, TTADDRBUFSIZ, "%s", host ? host : "");
+        sarg->port = port;
+        sarg->rtspath = rtspath;
+        sarg->exit= false;
+        timer->alive = true;
+        timer->started=true;
         if(pthread_create(&(timer->thid), NULL, ttservtimer, timer) == 0){
           ttservlog(serv, TTLOGINFO, "timer thread %d started", i + 1);
-          timer->alive = true;
-          timer->started=true;
+          printf("timer %d  started success!\n",i);
+          return true;
         } else {
+          timer->alive = false;
+          timer->started= false;
+          printf("pthread_create (ttservtimer) failed\n");
           ttservlog(serv, TTLOGERROR, "pthread_create (ttservtimer) failed");
           err = true;
+          return false;
         }
     }
   }
@@ -919,7 +928,7 @@ bool ttservmodifytimedhandler( const char * host, int port, const char * rtspath
 /* Add a timed handler to a server object. */
 bool ttservdeltimedhandler( const char * host, int port, const char * rtspath,TTSERV * serv)
 {
-  assert(serv && freq >= 0.0 && do_timed);
+  assert(serv);
     bool err=false;
     int cal=-99;
     for(int i = 0; i < serv->timernum; i++){
@@ -929,14 +938,14 @@ bool ttservdeltimedhandler( const char * host, int port, const char * rtspath,TT
             timer->serv = serv;
             REPLARG * sarg;
             sarg=(REPLARG *)timer->opq_timed;
-            printf("new started repl:%s,%d,%s\n",sarg->host,sarg->port,sarg->rtspath);
             if(sarg->port!=port) continue;
             if(strcmp(sarg->host,host)) continue;
             if(strcmp(sarg->rtspath,rtspath)) continue;
-            printf("new started repl:%s,%d,%s\n",sarg->host,sarg->port,sarg->rtspath);
-            cal=pthread_cancel(timer->thid);
-            printf("cancel result:%d\n",cal);
-
+            printf("new started repl:[%s,%d,%s] found \n",sarg->host,sarg->port,sarg->rtspath);
+            //cal=pthread_cancel(timer->thid);
+            sarg->exit=true;
+            timer->alive = false;
+            timer->started= false;
         }
     }
 }
@@ -1005,6 +1014,7 @@ bool ttservstart(TTSERV *serv){
     if(!timer->delay){
         timer->alive = false;
         timer->serv = serv;
+        timer->started=true;
         if(pthread_create(&(timer->thid), NULL, ttservtimer, timer) == 0){
           ttservlog(serv, TTLOGINFO, "timer thread %d started", i + 1);
           timer->alive = true;
