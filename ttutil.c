@@ -37,7 +37,7 @@
 typedef struct {                         // type of structure of master synchronous object
   char host[TTADDRBUFSIZ];
   int port;
-  const char *rtspath;
+  char rtspath[TTADDRBUFSIZ];
   uint64_t rts;
   TCADB *adb;
   TCULOG *ulog;
@@ -906,7 +906,7 @@ bool ttservmodifytimedhandler( const char * host, int port, const char * rtspath
         sarg=(REPLARG *)timer->opq_timed;
         snprintf(sarg->host, TTADDRBUFSIZ, "%s", host ? host : "");
         sarg->port = port;
-        sarg->rtspath = rtspath;
+        snprintf(sarg->rtspath, TTADDRBUFSIZ, "%s", rtspath? rtspath: "");
         sarg->exit= false;
         timer->alive = true;
         timer->started=true;

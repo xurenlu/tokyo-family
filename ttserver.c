@@ -72,7 +72,7 @@ typedef struct {                         // type of structure of logging opaque 
 typedef struct {                         // type of structure of master synchronous object
   char host[TTADDRBUFSIZ];
   int port;
-  const char *rtspath;
+  char rtspath[TTADDRBUFSIZ];
   uint64_t rts;
   TCADB *adb;
   TCULOG *ulog;
@@ -567,7 +567,7 @@ static int proc(const char *dbname, const char *host, int port, int thnum, int t
   REPLARG sarg;
   snprintf(sarg.host, TTADDRBUFSIZ, "%s", mhost ? mhost : "");
   sarg.port = mport;
-  sarg.rtspath = rtspath;
+  snprintf(sarg.rtspath, TTADDRBUFSIZ, "%s", rtspath? rtspath: "");
   sarg.rts = 0;
   sarg.adb = adb;
   sarg.ulog = ulog;
@@ -581,7 +581,7 @@ static int proc(const char *dbname, const char *host, int port, int thnum, int t
   REPLARG sarg2;
   snprintf(sarg2.host, TTADDRBUFSIZ, "%s", mhost ? mhost : "");
   sarg2.port = mport;
-  sarg2.rtspath = rtspath;
+  snprintf(sarg2.rtspath, TTADDRBUFSIZ, "%s", rtspath? rtspath: "");
   sarg2.rts = 0;
   sarg2.adb = adb;
   sarg2.ulog = ulog;
@@ -595,7 +595,7 @@ static int proc(const char *dbname, const char *host, int port, int thnum, int t
   REPLARG sarg3;
   snprintf(sarg3.host, TTADDRBUFSIZ, "%s", mhost ? mhost : "");
   sarg3.port = mport;
-  sarg3.rtspath = rtspath;
+  snprintf(sarg3.rtspath, TTADDRBUFSIZ, "%s", rtspath? rtspath: "");
   sarg3.rts = 0;
   sarg3.adb = adb;
   sarg3.ulog = ulog;
@@ -609,7 +609,7 @@ static int proc(const char *dbname, const char *host, int port, int thnum, int t
   REPLARG sarg4;
   snprintf(sarg4.host, TTADDRBUFSIZ, "%s", mhost ? mhost : "");
   sarg4.port = mport;
-  sarg4.rtspath = rtspath;
+  snprintf(sarg4.rtspath, TTADDRBUFSIZ, "%s", rtspath? rtspath: "");
   sarg4.rts = 0;
   sarg4.adb = adb;
   sarg4.ulog = ulog;
@@ -2152,7 +2152,7 @@ static void do_ext_delrepl(TTSOCK *sock, TASKARG *arg, TTREQ *req, char **tokens
       ttsockprintf(sock,"OK\n");
 }
 
-static void do_ext_addrepl(TTSOCK *sock, TASKARG *arg, TTREQ *req, char **tokens, int tnum){
+void do_ext_addrepl(TTSOCK *sock, TASKARG *arg, TTREQ *req, char **tokens, int tnum){
   ttservlog(g_serv, TTLOGDEBUG, "doing ext_addrepl command");
   if(tnum < 4){
     ttsockprintf(sock, "CLIENT_ERROR error\r\n");
@@ -2160,9 +2160,9 @@ static void do_ext_addrepl(TTSOCK *sock, TASKARG *arg, TTREQ *req, char **tokens
   }
   bool nr = tnum > 4 && !strcmp(tokens[4], "noreply");
   
-  const char *host = tokens[1];
+  char *host = tokens[1];
   int port = atoi(tokens[2]);
-  const char * rptpath = tokens[3];
+  char * rptpath = tokens[3];
 
     req->keep=true;
   ttservmodifytimedhandler(host,port,rptpath,g_serv);
